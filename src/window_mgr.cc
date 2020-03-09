@@ -113,7 +113,7 @@ class SDLWindowMgr : public my::WindowMgr {
     }
 
     ~SDLWindowMgr() { SDL_Quit(); }
-    std::shared_ptr<my::Window> create_window(const std::string &title,
+    my::Window* create_window(const std::string &title,
                                               uint32_t w, uint32_t h) override {
         // TODO: 考虑 继承
         SDL_Window *win = SDL_CreateWindow(
@@ -123,17 +123,20 @@ class SDLWindowMgr : public my::WindowMgr {
         if (win == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
-
-        return std::make_shared<SDLWindow>(win);
+        auto win_ptr = std::make_unique<SDLWindow>(win);
+        windows.pus(win_ptr);
+        return win_ptr.get();
     }
 
-    void remove_window(std::shared_ptr<my::Window>) override {}
+    void remove_window(my::Window *win) override {
+    }
 
     rxcpp::observable<std::shared_ptr<my::Event>> get_observable() override {
         return _sdl_event.get_observable();
     };
 
   private:
+    std::map<, std::unique_ptr<SDLWindow>> windows;
     rxcpp::subjects::subject<std::shared_ptr<my::Event>> _sdl_event;
 };
 

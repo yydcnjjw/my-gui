@@ -55,9 +55,9 @@ class WindowMgr {
 
     // TODO: 考虑使用 window mgr 管理 window
     // return Window * 而不是 std::shared_ptr
-    virtual std::shared_ptr<Window> create_window(const std::string &title,
+    virtual Window* create_window(const std::string &title,
                                                   uint32_t w, uint32_t h) = 0;
-    virtual void remove_window(std::shared_ptr<Window>) = 0;
+    virtual void remove_window(Window *) = 0;
     virtual rxcpp::observable<std::shared_ptr<Event>> get_observable() = 0;
 };
 

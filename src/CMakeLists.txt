@@ -3,7 +3,7 @@ include_directories(vulkan)
 set(my-gui_SRC
   main.cc
   logger.cc
-  # vulkan_render_device.cc
+  vulkan_render_device.cc
   vulkan_ctx.cc
   window_mgr.cc
   # vulkan/my_vulkan.cpp
@@ -19,6 +19,7 @@ find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(rxcpp CONFIG)
 find_package(Threads REQUIRED)
+find_package(Boost REQUIRED)
 
 add_executable(my-gui ${my-gui_SRC})
 target_link_libraries(my-gui
@@ -29,6 +30,7 @@ target_link_libraries(my-gui
   Threads::Threads
   ${CMAKE_DL_LIBS}
   SDL2::SDL2
+  Boost::headers
   )
 
 file(GLOB shaders
