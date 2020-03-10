@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
+#include "util.hpp"
 #include "vulkan_ctx.h"
 
 namespace {
@@ -98,8 +99,9 @@ class SDLWindowMgr : public my::WindowMgr {
                     if (!event) {
                         continue;
                     }
-                    s.on_next(std::shared_ptr<my::Event>(event));                   
-                    if (event->type == my::EventType::EVENT_QUIT) {
+                    auto ptr = std::shared_ptr<my::Event>(event);
+                    s.on_next(ptr);
+                    if (ptr->type == my::EventType::EVENT_QUIT) {
                         s.on_completed();
                         break;
                     }
@@ -107,36 +109,51 @@ class SDLWindowMgr : public my::WindowMgr {
             })
             .subscribe_on(thread)
             .observe_on(thread)
-            .subscribe([this](const std::shared_ptr<my::Event> &e) {
-                this->_sdl_event.get_subscriber().on_next(e);
-            });
+            .subscribe(
+                [this](const std::shared_ptr<my::Event> &e) {
+                    this->_sdl_event.get_subscriber().on_next(e);
+                },
+                [this](rxcpp::rxu::error_ptr e) {
+                    this->_sdl_event.get_subscriber().on_error(e);
+                },
+                [this]() { this->_sdl_event.get_subscriber().on_completed(); });
     }
 
     ~SDLWindowMgr() { SDL_Quit(); }
-    my::Window* create_window(const std::string &title,
-                                              uint32_t w, uint32_t h) override {
+    my::Window *create_window(const std::string &title, uint32_t w,
+                              uint32_t h) override {
         // TODO: 考虑 继承
-        SDL_Window *win = SDL_CreateWindow(
+        SDL_Window *sdl_win = SDL_CreateWindow(
             title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w,
-            h, SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY);
+            h, SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI);
 
-        if (win == nullptr) {
+        if (sdl_win == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
-        auto win_ptr = std::make_unique<SDLWindow>(win);
-        windows.pus(win_ptr);
-        return win_ptr.get();
+        auto win = std::make_unique<SDLWindow>(sdl_win);
+        auto win_ptr = win.get();
+        windows[win_ptr] = std::move(win);
+        return win_ptr;
     }
 
     void remove_window(my::Window *win) override {
+        windows.erase(win);
     }
 
     rxcpp::observable<std::shared_ptr<my::Event>> get_observable() override {
         return _sdl_event.get_observable();
     };
 
+    rxcpp::observable<std::shared_ptr<my::Event>>
+    event(const my::EventType &type) override {
+        return this->get_observable().filter(
+            [type](const std::shared_ptr<my::Event> &e) {
+                return e->type == type;
+            });
+    }
+
   private:
-    std::map<, std::unique_ptr<SDLWindow>> windows;
+    std::map<my::Window *, std::unique_ptr<SDLWindow>> windows;
     rxcpp::subjects::subject<std::shared_ptr<my::Event>> _sdl_event;
 };
 

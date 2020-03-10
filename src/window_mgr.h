@@ -17,10 +17,12 @@ struct Position {
     int32_t x;
     int32_t y;
 
+    Position() : Position(0, 0) {}
+    Position(int32_t x, int32_t y) : x(x), y(y) {}
+
     bool operator==(const Position &pos) const {
         return this->x == pos.x && this->y == pos.y;
     }
-    
 };
 
 struct MouseMotionEvent : public Event {
@@ -55,10 +57,12 @@ class WindowMgr {
 
     // TODO: 考虑使用 window mgr 管理 window
     // return Window * 而不是 std::shared_ptr
-    virtual Window* create_window(const std::string &title,
-                                                  uint32_t w, uint32_t h) = 0;
+    virtual Window *create_window(const std::string &title, uint32_t w,
+                                  uint32_t h) = 0;
     virtual void remove_window(Window *) = 0;
     virtual rxcpp::observable<std::shared_ptr<Event>> get_observable() = 0;
+    virtual rxcpp::observable<std::shared_ptr<Event>>
+    event(const EventType &) = 0;
 };
 
 WindowMgr *get_window_mgr();

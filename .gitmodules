@@ -1,0 +1,9 @@
+[submodule "thirdparty/RxCpp"]
+	path = thirdparty/RxCpp
+	url = https://github.com/ReactiveX/RxCpp.git
+[submodule "thirdparty/glm"]
+	path = thirdparty/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "thirdparty/googletest"]
+	path = thirdparty/googletest
+	url = https://github.com/google/googletest.git

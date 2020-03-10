@@ -66,6 +66,6 @@ class VulkanCtx {
     virtual vk::SampleCountFlagBits get_max_usable_sample_count() const = 0;
 };
 class Window;
-std::shared_ptr<VulkanCtx> make_vulkan_ctx(const std::shared_ptr<Window> &);
+std::shared_ptr<VulkanCtx> make_vulkan_ctx(Window *);
 
 } // namespace my

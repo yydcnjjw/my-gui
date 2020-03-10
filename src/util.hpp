@@ -6,17 +6,15 @@
 #include <limits>
 #include <vector>
 
-typedef uint64_t UUID;
-
-namespace Util {
 namespace ID {
+typedef uint64_t UUID;
 static UUID get() {
     static std::atomic<UUID> id;
     assert(id < std::numeric_limits<UUID>::max());
     return id++;
 }
 }; // namespace ID
-
+namespace Util {
 static std::vector<char> read_file(const std::string &filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 

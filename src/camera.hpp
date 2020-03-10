@@ -14,31 +14,16 @@ constexpr float SENSITIVITY = 0.1f;
 constexpr float MOVE_SPEED = 0.01f;
 class Camera {
   public:
-    Camera(const rxcpp::observable<std::shared_ptr<Event>> &event,
-           glm::vec3 postion = {0.0f, 0.0f, 0.0f},
+    Camera(WindowMgr *win_mgr = nullptr, glm::vec3 postion = {0.0f, 0.0f, 0.0f},
            glm::vec3 up = {0.0f, 0.0f, 1.0f})
-        : Camera(postion, up) {
-        event
-            .filter([](const std::shared_ptr<my::Event> &e) {
-                return e->type == EventType::EVENT_MOUSE_MOTION;
-            })
-            .subscribe([this](const std::shared_ptr<my::Event> &e) {
-                this->_update_mouse_motion(
-                    std::static_pointer_cast<my::MouseMotionEvent>(e));
-            });
-        event
-            .filter([](const std::shared_ptr<my::Event> &e) {
-                return e->type == EventType::EVENT_KEYBOARD;
-            })
-            .subscribe([this](const std::shared_ptr<my::Event> &e) {
-                this->_update_keyboard(
-                    std::static_pointer_cast<my::KeyboardEvent>(e));
-            });
-    }
+        : _position(postion), _up(up) {
 
-    Camera(glm::vec3 postion, glm::vec3 up)
-        : view(glm::lookAt(postion, this->_front, up)), _position(postion),
-          _up(up) {}
+        this->view = glm::lookAt(postion, this->_front, up);
+
+        if (win_mgr) {
+            this->_subscribe_window_event(win_mgr);
+        }
+    }
 
     glm::mat4 perspective;
     glm::mat4 view;
@@ -47,12 +32,39 @@ class Camera {
     glm::vec3 _position;
     glm::vec3 _up;
     glm::vec3 _front{0.0f, 0.0f, 0.0f};
-    glm::vec3 _right{
-        glm::normalize(glm::cross(this->_front, {0.0f, 1.0f, 0.0f}))};
+    glm::vec3 _right{this->_get_right(this->_front)};
 
     Position _mouse_pos;
     float _yaw{0.0f};
     float _pitch{0.0f};
+
+    inline glm::vec3 _get_right(const glm::vec3 &front) {
+        return glm::normalize(glm::cross(front, {0.0f, 1.0f, 0.0f}));
+    }
+
+    inline glm::vec3 _get_front(float yaw, float pitch) {
+        return glm::normalize(glm::vec3{
+            cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
+            sin(glm::radians(pitch)),
+            sin(glm::radians(yaw)) * cos(glm::radians(pitch)),
+        });
+    }
+    inline glm::vec3 _get_up(const glm::vec3 &front, const glm::vec3 &right) {
+        return glm::normalize(glm::cross(front, right));
+    }
+
+    void _subscribe_window_event(WindowMgr *win_mgr) {
+        win_mgr->event(EventType::EVENT_MOUSE_MOTION)
+            .subscribe([this](const std::shared_ptr<my::Event> &e) {
+                this->_update_mouse_motion(
+                    std::static_pointer_cast<my::MouseMotionEvent>(e));
+            });
+        win_mgr->event(EventType::EVENT_KEYBOARD)
+            .subscribe([this](const std::shared_ptr<my::Event> &e) {
+                this->_update_keyboard(
+                    std::static_pointer_cast<my::KeyboardEvent>(e));
+            });
+    }
 
     void _update_view() {
         this->view = glm::lookAt(this->_position,
@@ -73,17 +85,11 @@ class Camera {
         if (this->_pitch < -89.0f)
             this->_pitch = -89.0f;
 
-        glm::vec3 front{
-            cos(glm::radians(this->_yaw)) * cos(glm::radians(this->_pitch)),
-            sin(glm::radians(this->_pitch)),
-            sin(glm::radians(this->_yaw)) * cos(glm::radians(this->_pitch)),
-        };
-        this->_front = glm::normalize(front);
+        this->_front = this->_get_front(this->_yaw, this->_pitch);
 
-        this->_right =
-            glm::normalize(glm::cross(this->_front, {0.0f, 1.0f, 0.0f}));
+        this->_right = this->_get_right(this->_front);
 
-        this->_up = glm::normalize(glm::cross(this->_right, this->_front));
+        this->_up = this->_get_up(this->_front, this->_right);
 
         this->_update_view();
 

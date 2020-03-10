@@ -16,8 +16,7 @@ constexpr int MAX_FRAMES_IN_FLIGHT = 1;
 class MyVulkanCtx : public my::VulkanCtx {
 
   public:
-    explicit MyVulkanCtx(std::shared_ptr<my::Window> win)
-        : _platform_win(std::move(win)) {
+    explicit MyVulkanCtx(my::Window *win) : _platform_win(win) {
         this->_init();
     }
 
@@ -190,7 +189,7 @@ class MyVulkanCtx : public my::VulkanCtx {
     vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic>
         _debug_messenger;
 
-    std::shared_ptr<my::Window> _platform_win;
+    my::Window *_platform_win;
     vk::UniqueSurfaceKHR _surface;
 
     vk::PhysicalDevice _physical_device;
@@ -488,7 +487,7 @@ class MyVulkanCtx : public my::VulkanCtx {
         auto &capabilities = detail.capabilities;
         auto &surface_format = detail.choose_surface_format();
         auto &present_mode = detail.choose_present_mode();
-        auto extent = detail.choose_extent(this->_platform_win.get());
+        auto extent = detail.choose_extent(this->_platform_win);
 
         auto img_count = detail.capabilities.minImageCount + 1;
         if (detail.capabilities.maxImageCount > 0 &&
@@ -633,7 +632,7 @@ class MyVulkanCtx : public my::VulkanCtx {
 } // namespace
 
 namespace my {
-std::shared_ptr<VulkanCtx> make_vulkan_ctx(const std::shared_ptr<Window> &win) {
+std::shared_ptr<VulkanCtx> make_vulkan_ctx(Window *win) {
     return std::make_shared<MyVulkanCtx>(win);
 }
 } // namespace my
