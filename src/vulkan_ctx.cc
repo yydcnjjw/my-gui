@@ -623,8 +623,14 @@ class MyVulkanCtx : public my::VulkanCtx {
             vk::DebugUtilsMessageSeverityFlagBitsEXT(messageSeverity));
         auto type =
             vk::to_string(vk::DebugUtilsMessageTypeFlagsEXT(messageTypes));
-        GLOG_D("[%s:%s]: %s", level.c_str(), type.c_str(),
-               pCallbackData->pMessage);
+
+        if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+            GLOG_E("[%s:%s]: %s", level.c_str(), type.c_str(),
+                   pCallbackData->pMessage);
+        } else {
+            GLOG_D("[%s:%s]: %s", level.c_str(), type.c_str(),
+                   pCallbackData->pMessage);
+        }
         return VK_FALSE;
     }
 }; // namespace

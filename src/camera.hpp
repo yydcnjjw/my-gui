@@ -17,7 +17,6 @@ class Camera {
     Camera(WindowMgr *win_mgr = nullptr, glm::vec3 postion = {0.0f, 0.0f, 0.0f},
            glm::vec3 up = {0.0f, 0.0f, 1.0f})
         : _position(postion), _up(up) {
-
         this->view = glm::lookAt(postion, this->_front, up);
 
         if (win_mgr) {

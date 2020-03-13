@@ -16,7 +16,6 @@
 
 namespace my {
 
-    
 class Vertex {
   public:
     glm::vec3 pos;
@@ -132,6 +131,11 @@ struct VulkanUniformBuffer {
     BOOST_MOVABLE_BUT_NOT_COPYABLE(VulkanUniformBuffer);
 };
 
+class VulkanPipeline {
+    vk::UniquePipeline handle;
+    vk::UniquePipelineLayout layout;
+};
+
 struct VulkanDrawCtx;
 typedef std::function<void(const VulkanDrawCtx &, const VulkanCtx &,
                            my::RenderDevice &)>
@@ -155,8 +159,6 @@ class RenderDevice {
 
     virtual ~RenderDevice() = default;
 
-    virtual vk::UniqueRenderPass create_render_pass() = 0;
-
     virtual std::shared_ptr<VulkanShader>
     create_shader(const std::vector<char> &code,
                   const vk::ShaderStageFlagBits &stage,
@@ -165,15 +167,12 @@ class RenderDevice {
     virtual vk::UniquePipeline
     create_pipeline(const std::vector<std::shared_ptr<VulkanShader>> &shaders,
                     const VertexDesciption &vertex_desc,
-                    const vk::RenderPass &render_pass) = 0;
+                    const std::vector<vk::PushConstantRange>
+                        &push_constant_ranges = {}) = 0;
 
-    // virtual std::vector<vk::UniqueFramebuffer>
-    // create_frame_buffers(const vk::RenderPass &render_pass) = 0;
-
-    // virtual std::vector<vk::UniqueCommandBuffer> create_command_buffers(
-    //     const std::vector<vk::UniqueFramebuffer> &frame_buffers,
-    //     const vk::RenderPass &render_pass,
-    //     std::function<void(vk::CommandBuffer &)> callback) = 0;
+    virtual std::shared_ptr<BufferBinding<vk::UniqueBuffer>>
+    create_buffer(const void *data, const vk::DeviceSize &buffer_size,
+                  const vk::BufferUsageFlags &usage) = 0;
 
     virtual std::shared_ptr<BufferBinding<vk::UniqueBuffer>>
     create_vertex_buffer(const std::vector<Vertex> &vertices) = 0;
@@ -195,6 +194,8 @@ class RenderDevice {
     virtual void bind_index_buffer(
         const std::shared_ptr<BufferBinding<vk::UniqueBuffer>> &) = 0;
 
+    virtual void push_constants() = 0;
+
     virtual void
     copy_to_buffer(void *src, size_t size,
                    const my::BufferBinding<vk::UniqueBuffer> &bind) = 0;
@@ -205,11 +206,10 @@ class RenderDevice {
 
     virtual void draw(size_t index_count) = 0;
 
-    virtual void draw_begin(const vk::RenderPass &render_pass) = 0;
+    virtual void draw_begin() = 0;
     virtual void draw_end() = 0;
 };
 
-std::shared_ptr<RenderDevice>
-make_vulkan_render_device(std::shared_ptr<VulkanCtx> ctx);
+std::shared_ptr<RenderDevice> make_vulkan_render_device(VulkanCtx *ctx);
 
 } // namespace my

@@ -13,7 +13,10 @@ class StdLoggerOutput : public Logger::LoggerOutput {
         : Logger::LoggerOutput(level) {}
     ~StdLoggerOutput() override = default;
     void operator()(const Logger::LogMsg &msg) override {
-        std::cout << msg.format() << std::endl;
+        std::cout << msg.format() << std::endl;        
+        if (msg.level == Logger::ERROR) {
+            std::terminate();
+        }
     };
 };
 } // namespace
@@ -113,6 +116,7 @@ Logger::LogMsg::get_level_str() {
     static const std::map<Logger::Level, const std::string> _level_str = {
         {Logger::Level::DEBUG, "DEBUG"},
         {Logger::Level::INFO, "INFO"},
+        {Logger::Level::WARN, "WARN"},
         {Logger::Level::ERROR, "ERROR"}};
     return _level_str;
 }

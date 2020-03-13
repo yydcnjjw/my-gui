@@ -7,7 +7,7 @@
 namespace {
 class VulkanRenderDevice : public my::RenderDevice {
   public:
-    explicit VulkanRenderDevice(const std::shared_ptr<my::VulkanCtx> &ctx)
+    explicit VulkanRenderDevice(my::VulkanCtx *ctx)
         : _vk_ctx(ctx), _device(ctx->get_device()),
           _primary_cmd_buffer(this->_create_primary_buffer()) {
 
@@ -24,11 +24,13 @@ class VulkanRenderDevice : public my::RenderDevice {
         this->_create_descriptor_set_layout();
         this->_create_desciptor_pool();
         this->_create_descriptor_sets();
+
+        this->_render_pass = this->_create_render_pass();
     }
 
     ~VulkanRenderDevice() override { this->_device.waitIdle(); }
 
-    void draw_begin(const vk::RenderPass &render_pass) override {
+    void draw_begin() override {
         auto &swapchain = this->_vk_ctx->get_swapchain();
         auto &current_buffer_index = this->_vk_ctx->get_current_buffer_index();
         auto &current_buffer = this->_frame_buffers[current_buffer_index].get();
@@ -45,8 +47,9 @@ class VulkanRenderDevice : public my::RenderDevice {
         }
 
         vk::RenderPassBeginInfo render_pass_info(
-            render_pass, current_buffer, {{0, 0}, swapchain.extent},
-            clear_values.size(), clear_values.data());
+            this->_render_pass.get(), current_buffer,
+            {{0, 0}, swapchain.extent}, clear_values.size(),
+            clear_values.data());
 
         cb.beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
 
@@ -90,87 +93,14 @@ class VulkanRenderDevice : public my::RenderDevice {
                            vk::IndexType::eUint32);
     }
 
+    void push_constants() override {
+        auto &cb = this->_primary_cmd_buffer.get();
+        cb.pushConstants(this->_pipeline_layout, , uint32_t offset, ArrayProxy<const T> values)
+    }
+
     void draw(size_t index_count) override {
         auto &cb = this->_primary_cmd_buffer.get();
         cb.drawIndexed(index_count, 1, 0, 0, 0);
-    }
-
-    enum AttachmentType { INPUT, COLOR, RESOLVE, DEPTH_STENCIL };
-
-    struct Attachment {
-        vk::ImageLayout layout;
-        vk::AttachmentDescription desc;
-    };
-
-    vk::UniqueRenderPass create_render_pass() override {
-        auto &swapchain = this->_vk_ctx->get_swapchain();
-
-        vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics);
-
-        std::vector<vk::AttachmentDescription> attachments;
-
-        // TODO: remove ref_index
-        std::vector<vk::AttachmentReference> color_refs;
-
-        if (this->_enable_sample_buffer) {
-            vk::AttachmentDescription sample_attachment(
-                {}, swapchain.format, this->_msaa_samples,
-                vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
-                vk::AttachmentLoadOp::eDontCare,
-                vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-                vk::ImageLayout::eColorAttachmentOptimal);
-
-            color_refs.push_back({static_cast<uint32_t>(attachments.size()),
-                                  vk::ImageLayout::eColorAttachmentOptimal});
-            attachments.push_back(sample_attachment);
-        }
-
-        subpass.setColorAttachmentCount(color_refs.size());
-        subpass.setPColorAttachments(color_refs.data());
-
-        vk::AttachmentReference depth_ref;
-        if (this->_enable_depth_buffer) {
-            vk::AttachmentDescription depth_attachment(
-                {}, this->_vk_ctx->get_depth_format(), this->_msaa_samples,
-                vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-                vk::AttachmentLoadOp::eDontCare,
-                vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
-                vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-            depth_ref = {static_cast<uint32_t>(attachments.size()),
-                         vk::ImageLayout::eDepthStencilAttachmentOptimal};
-            attachments.push_back(depth_attachment);
-
-            subpass.setPDepthStencilAttachment(&depth_ref);
-        }
-
-        vk::AttachmentDescription resolve_attachment(
-            {}, swapchain.format, vk::SampleCountFlagBits::e1,
-            vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eStore,
-            vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-            vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR);
-        vk::AttachmentReference resolve_ref(
-            {static_cast<uint32_t>(attachments.size()),
-             vk::ImageLayout::eColorAttachmentOptimal});
-        attachments.push_back(resolve_attachment);
-
-        subpass.setPResolveAttachments(&resolve_ref);
-
-        vk::SubpassDependency dep(
-            VK_SUBPASS_EXTERNAL, 0,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput,
-            vk::PipelineStageFlagBits::eColorAttachmentOutput, {},
-            vk::AccessFlagBits::eColorAttachmentRead |
-                vk::AccessFlagBits::eColorAttachmentWrite,
-            {});
-
-        vk::RenderPassCreateInfo create_info(
-            {}, attachments.size(), attachments.data(), 1, &subpass, 1, &dep);
-
-        auto render_pass = this->_device.createRenderPassUnique(create_info);
-
-        this->_frame_buffers = this->_create_frame_buffers(render_pass.get());
-        return render_pass;
     }
 
     std::shared_ptr<my::VulkanShader>
@@ -185,7 +115,8 @@ class VulkanRenderDevice : public my::RenderDevice {
     vk::UniquePipeline create_pipeline(
         const std::vector<std::shared_ptr<my::VulkanShader>> &shaders,
         const my::VertexDesciption &vertex_desc,
-        const vk::RenderPass &render_pass) override {
+        const std::vector<vk::PushConstantRange> &push_constant_ranges)
+        override {
         std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
         std::transform(shaders.begin(), shaders.end(),
                        std::back_inserter(shader_stages),
@@ -210,8 +141,8 @@ class VulkanRenderDevice : public my::RenderDevice {
         // XXX: front face
         vk::PipelineRasterizationStateCreateInfo rasterization_state(
             {}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill,
-            vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise,
-            VK_FALSE, {}, {}, {}, 1.0f);
+            vk::CullModeFlagBits::eBack, vk::FrontFace::eClockwise, VK_FALSE,
+            {}, {}, {}, 1.0f);
 
         vk::PipelineMultisampleStateCreateInfo multisample_state(
             {}, this->_msaa_samples, VK_FALSE);
@@ -227,14 +158,15 @@ class VulkanRenderDevice : public my::RenderDevice {
             {0.0f, 0.0f, 0.0f, 0.0f});
 
         this->_pipeline_layout = this->_device.createPipelineLayoutUnique(
-            vk::PipelineLayoutCreateInfo({}, 1,
-                                         &this->_descriptor_set_layout.get()));
+            vk::PipelineLayoutCreateInfo(
+                {}, 1, &this->_descriptor_set_layout.get(),
+                push_constant_ranges.size(), push_constant_ranges.data()));
 
         vk::GraphicsPipelineCreateInfo create_info(
             {}, shader_stages.size(), shader_stages.data(), &vertex_input_state,
             &input_assembly_state, {}, &viewport_state, &rasterization_state,
             &multisample_state, {}, &color_blend_state, {},
-            this->_pipeline_layout.get(), render_pass, 0, {}, {});
+            this->_pipeline_layout.get(), this->_render_pass.get(), 0, {}, {});
 
         vk::PipelineDepthStencilStateCreateInfo depth_stencil_state;
         if (this->_enable_depth_buffer) {
@@ -244,6 +176,12 @@ class VulkanRenderDevice : public my::RenderDevice {
         }
 
         return this->_device.createGraphicsPipelineUnique({}, create_info);
+    }
+
+    virtual std::shared_ptr<my::BufferBinding<vk::UniqueBuffer>>
+    create_buffer(const void *data, const vk::DeviceSize &buffer_size,
+                  const vk::BufferUsageFlags &usage) override {
+        return this->_create_buffer_with_device(data, buffer_size, usage);
     }
 
     std::shared_ptr<my::BufferBinding<vk::UniqueBuffer>>
@@ -357,10 +295,10 @@ class VulkanRenderDevice : public my::RenderDevice {
         this->_device.unmapMemory(bind.memory.get());
     }
 
-    virtual void wait_idle() override { this->_device.waitIdle(); };
+    void wait_idle() override { this->_device.waitIdle(); };
 
   private:
-    std::shared_ptr<my::VulkanCtx> _vk_ctx;
+    my::VulkanCtx *_vk_ctx;
     vk::Device _device;
     vk::UniqueCommandBuffer _primary_cmd_buffer;
     my::VulkanDrawCtx _draw_ctx;
@@ -380,12 +318,18 @@ class VulkanRenderDevice : public my::RenderDevice {
     vk::SampleCountFlagBits _msaa_samples = vk::SampleCountFlagBits::e1;
 
     std::vector<vk::UniqueImageView> _swapchain_image_views;
+
+    vk::UniqueRenderPass _render_pass;
     std::vector<vk::UniqueFramebuffer> _frame_buffers;
 
     // Options
+    // bool _enable_depth_buffer = true;
+    // bool _enable_sample_buffer = true;
+    // bool _enable_mipmaps = true;
+
     bool _enable_depth_buffer = true;
-    bool _enable_sample_buffer = true;
-    bool _enable_mipmaps = true;
+    bool _enable_sample_buffer = false;
+    bool _enable_mipmaps = false;
 
     vk::UniqueCommandBuffer _create_primary_buffer() {
         // auto count = this->_vk_ctx->get_swapchain().image_count;
@@ -460,13 +404,17 @@ class VulkanRenderDevice : public my::RenderDevice {
                 if (this->_enable_sample_buffer) {
                     attachments.push_back(
                         this->_sample_buffer.image_view.get());
+                } else {
+                    attachments.push_back(img_view.get());
                 }
 
                 if (this->_enable_depth_buffer) {
                     attachments.push_back(this->_depth_buffer.image_view.get());
                 }
 
-                attachments.push_back(img_view.get());
+                if (this->_enable_sample_buffer) {
+                    attachments.push_back(img_view.get());
+                }
 
                 vk::FramebufferCreateInfo create_info(
                     {}, render_pass, attachments.size(), attachments.data(),
@@ -791,11 +739,114 @@ class VulkanRenderDevice : public my::RenderDevice {
         this->_descriptor_sets =
             this->_device.allocateDescriptorSetsUnique(alloc_info);
     }
+
+    enum AttachmentType { INPUT, COLOR, RESOLVE, DEPTH_STENCIL };
+
+    struct Attachment {
+        vk::ImageLayout layout;
+        vk::AttachmentDescription desc;
+    };
+
+    vk::UniqueRenderPass _create_render_pass() {
+        auto &swapchain = this->_vk_ctx->get_swapchain();
+
+        vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics);
+
+        std::vector<vk::AttachmentDescription> attachments;
+
+        std::vector<vk::AttachmentReference> color_refs;
+
+        if (this->_enable_sample_buffer) {
+            vk::AttachmentDescription sample_attachment(
+                {}, swapchain.format, this->_msaa_samples,
+                vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
+                vk::AttachmentLoadOp::eDontCare,
+                vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
+                vk::ImageLayout::eColorAttachmentOptimal);
+
+            color_refs.push_back({static_cast<uint32_t>(attachments.size()),
+                                  vk::ImageLayout::eColorAttachmentOptimal});
+            attachments.push_back(sample_attachment);
+        } else {
+            vk::AttachmentDescription color_attachment(
+                {}, swapchain.format, vk::SampleCountFlagBits::e1,
+                vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
+                vk::AttachmentLoadOp::eDontCare,
+                vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
+                vk::ImageLayout::ePresentSrcKHR);
+
+            color_refs.push_back({static_cast<uint32_t>(attachments.size()),
+                                  vk::ImageLayout::eColorAttachmentOptimal});
+            attachments.push_back(color_attachment);
+        }
+
+        vk::AttachmentReference depth_ref;
+        if (this->_enable_depth_buffer) {
+            vk::AttachmentDescription depth_attachment(
+                {}, this->_vk_ctx->get_depth_format(), this->_msaa_samples,
+                vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
+                vk::AttachmentLoadOp::eDontCare,
+                vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
+                vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+            depth_ref = {static_cast<uint32_t>(attachments.size()),
+                         vk::ImageLayout::eDepthStencilAttachmentOptimal};
+            attachments.push_back(depth_attachment);
+
+            subpass.setPDepthStencilAttachment(&depth_ref);
+        }
+
+        if (this->_enable_sample_buffer) {
+            vk::AttachmentDescription resolve_attachment(
+                {}, swapchain.format, vk::SampleCountFlagBits::e1,
+                vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eStore,
+                vk::AttachmentLoadOp::eDontCare,
+                vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
+                vk::ImageLayout::ePresentSrcKHR);
+            vk::AttachmentReference resolve_ref(
+                {static_cast<uint32_t>(attachments.size()),
+                 vk::ImageLayout::eColorAttachmentOptimal});
+            attachments.push_back(resolve_attachment);
+
+            subpass.setPResolveAttachments(&resolve_ref);
+        } else {
+            // vk::AttachmentDescription color_attachment(
+            //     {}, swapchain.format, vk::SampleCountFlagBits::e1,
+            //     vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
+            //     vk::AttachmentLoadOp::eDontCare,
+            //     vk::AttachmentStoreOp::eDontCare,
+            //     vk::ImageLayout::eUndefined,
+            //     vk::ImageLayout::ePresentSrcKHR);
+
+            // color_refs.push_back({static_cast<uint32_t>(attachments.size()),
+            //                       vk::ImageLayout::eColorAttachmentOptimal});
+            // attachments.push_back(color_attachment);
+        }
+
+        subpass.setColorAttachmentCount(color_refs.size());
+        subpass.setPColorAttachments(color_refs.data());
+
+        vk::SubpassDependency dep(
+            VK_SUBPASS_EXTERNAL, 0,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput, {},
+            vk::AccessFlagBits::eColorAttachmentRead |
+                vk::AccessFlagBits::eColorAttachmentWrite,
+            {});
+
+        vk::RenderPassCreateInfo create_info(
+            {}, attachments.size(), attachments.data(), 1, &subpass, 1, &dep);
+
+        auto render_pass = this->_device.createRenderPassUnique(create_info);
+
+        this->_frame_buffers = this->_create_frame_buffers(render_pass.get());
+        return render_pass;
+    }
+
 }; // namespace
 } // namespace
 namespace my {
-std::shared_ptr<RenderDevice>
-make_vulkan_render_device(std::shared_ptr<VulkanCtx> ctx) {
+std::shared_ptr<RenderDevice> make_vulkan_render_device(VulkanCtx *ctx) {
     return std::make_shared<VulkanRenderDevice>(ctx);
 }
 

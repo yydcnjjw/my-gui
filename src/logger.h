@@ -7,7 +7,7 @@
 
 class Logger {
   public:
-    enum Level { DEBUG, INFO, ERROR };
+    enum Level { DEBUG, INFO, WARN, ERROR };
     typedef std::bitset<32> bitmap;
 
     static const Logger::bitmap logger_all_target;
@@ -39,7 +39,7 @@ class Logger {
     Logger();
     ~Logger();
 
-    void addLogOutputTarget(const std::shared_ptr<LoggerOutput>& output);
+    void addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output);
 
     void Log(bitmap bitmap, Logger::Level type, const char *file_name,
              int file_len, const char *fmt, ...);
@@ -50,7 +50,7 @@ class Logger {
     std::string _buf;
     std::mutex _lock;
     void _addLogOutputTarget(unsigned long offset,
-                             const std::shared_ptr<LoggerOutput>& output);
+                             const std::shared_ptr<LoggerOutput> &output);
 
     std::map<bitmap, rxcpp::subscription> _output_targets;
 
@@ -69,17 +69,11 @@ Logger *_get_g_logger();
 #define LOG_I(logger, target, fmt, args...)                                    \
     (logger)->Log(target, Logger::Level::INFO, __FILE__, __LINE__, fmt, ##args)
 
+#define LOG_W(logger, target, fmt, args...)                                    \
+    (logger)->Log(target, Logger::Level::WARN, __FILE__, __LINE__, fmt, ##args)
+
 #define LOG_E(logger, target, fmt, args...)                                    \
     (logger)->Log(target, Logger::Level::ERROR, __FILE__, __LINE__, fmt, ##args)
-
-#define GLOG_D(fmt, args...)                                                   \
-    LOG_D(_get_g_logger(), Logger::logger_all_target, fmt, ##args)
-
-#define GLOG_I(fmt, args...)                                                   \
-    LOG_I(_get_g_logger(), Logger::logger_all_target, fmt, ##args)
-
-#define GLOG_E(fmt, args...)                                                   \
-    LOG_E(_get_g_logger(), Logger::logger_all_target, fmt, ##args)
 
 #define GLOG_T_D(target, fmt, args...)                                         \
     LOG_D(_get_g_logger(), target, fmt, ##args)
@@ -87,5 +81,20 @@ Logger *_get_g_logger();
 #define GLOG_T_I(target, fmt, args...)                                         \
     LOG_I(_get_g_logger(), target, fmt, ##args)
 
+#define GLOG_T_W(target, fmt, args...)                                         \
+    LOG_W(_get_g_logger(), target, fmt, ##args)
+
 #define GLOG_T_E(target, fmt, args...)                                         \
     LOG_E(_get_g_logger(), target, fmt, ##args)
+
+#define GLOG_D(fmt, args...)                                                   \
+    GLOG_T_D(Logger::logger_all_target, fmt, ##args)
+
+#define GLOG_I(fmt, args...)                                                   \
+    GLOG_T_I(Logger::logger_all_target, fmt, ##args)
+
+#define GLOG_W(fmt, args...)                                                   \
+    GLOG_T_W(Logger::logger_all_target, fmt, ##args)
+
+#define GLOG_E(fmt, args...)                                                   \
+    GLOG_T_E(Logger::logger_all_target, fmt, ##args)

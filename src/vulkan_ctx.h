@@ -31,7 +31,6 @@ struct VulkanSwapchain {
     vk::Format format;
     vk::Extent2D extent;
     vk::PresentModeKHR present_mode;
-
 };
     
 class RenderDevice;

@@ -2,6 +2,8 @@
 #include "util.hpp"
 
 #include "camera.hpp"
+#include "canvas.h"
+#include "draw_list.h"
 #include "render_device.h"
 #include "vulkan_ctx.h"
 #include "window_mgr.h"
@@ -41,13 +43,6 @@ void load_model(std::vector<my::Vertex> &vertices,
                           MODEL_PATH.c_str())) {
         throw std::runtime_error(warn + err);
     }
-    // std::unordered_map<my::Vertex, uint32_t> unique_vertices;
-    // std::vector<my::Vertex> vertices = {
-    //     {{-0.5f, 0.5f, 0.0f}, {1.0f, 0.0f}},
-    //     {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f}},
-    //     {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f}},
-    //     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f}}};
-    // std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
 
     for (const auto &shape : shapes) {
         for (const auto &index : shape.mesh.indices) {
@@ -81,93 +76,102 @@ int main(int argc, char *argv[]) {
 
         my::Camera camera(win_mgr);
 
-        // int tex_width, tex_height, tex_channels;
-        // stbi_uc *pixels = stbi_load(TEXTURE_PATH.c_str(), &tex_width,
-        //                             &tex_height, &tex_channels,
-        //                             STBI_rgb_alpha);
-        // if (!pixels) {
-        //     throw std::runtime_error("failed to load texture image!");
-        // }
+        int tex_width, tex_height, tex_channels;
+        stbi_uc *pixels = stbi_load(TEXTURE_PATH.c_str(), &tex_width,
+                                    &tex_height, &tex_channels,
+                                    STBI_rgb_alpha);
+        if (!pixels) {
+            throw std::runtime_error("failed to load texture image!");
+        }
 
         std::vector<my::Vertex> vertices;
         std::vector<uint32_t> indices;
-        // load_model(vertices, indices);
-        // auto draw_thread = std::thread([&]() {
-        auto ctx = my::make_vulkan_ctx(win);
-        auto device = my::make_vulkan_render_device(ctx);
+        load_model(vertices, indices);
 
-        // auto vertex_binding = device->create_vertex_buffer(vertices);
+        auto draw_thread = std::thread([&]() {
+            auto ctx = my::make_vulkan_ctx(win);
+            auto device = my::make_vulkan_render_device(ctx.get());
+            auto canvas = my::make_vulkan_canvas(device.get());
 
-        // auto index_binding = device->create_index_buffer(indices);
+            auto vertex_binding = device->create_vertex_buffer(vertices);
 
-        auto uniform_buffer =
-            device->create_uniform_buffer(sizeof(UniformBufferObject));
+            auto index_binding = device->create_index_buffer(indices);
 
-        //     auto texture_buffer =
-        //         device->create_texture_buffer(pixels, tex_width, tex_height);
+            auto uniform_buffer =
+                device->create_uniform_buffer(sizeof(UniformBufferObject));
 
-        //     auto render_pass = device->create_render_pass();
+            auto texture_buffer =
+                device->create_texture_buffer(pixels, tex_width, tex_height);
 
-        //     auto vert_shader = device->create_shader(
-        //         Util::read_file("shaders/shader.vert.spv"),
-        //         vk::ShaderStageFlagBits ::eVertex, "main");
-        //     auto frag_shader = device->create_shader(
-        //         Util::read_file("shaders/shader.frag.spv"),
-        //         vk::ShaderStageFlagBits ::eFragment, "main");
+            auto vert_shader = device->create_shader(
+                Util::read_file("shaders/shader.vert.spv"),
+                vk::ShaderStageFlagBits ::eVertex, "main");
+            auto frag_shader = device->create_shader(
+                Util::read_file("shaders/shader.frag.spv"),
+                vk::ShaderStageFlagBits ::eFragment, "main");
 
-        //     my::VertexDesciption vertex_desc = {
-        //         {my::Vertex::get_binding_description()},
-        //         my::Vertex::get_attribute_descriptions()};
+            my::VertexDesciption vertex_desc = {
+                {my::Vertex::get_binding_description()},
+                my::Vertex::get_attribute_descriptions()};
 
-        //     auto pipeline = device->create_pipeline(
-        //         {vert_shader, frag_shader}, vertex_desc, render_pass.get());
+            auto pipeline = device->create_pipeline(
+                {vert_shader, frag_shader}, vertex_desc);
 
-        //     auto &swapchain = ctx->get_swapchain();
-        //     GLOG_I("draw begin ...");
+            auto &swapchain = ctx->get_swapchain();
+            GLOG_I("draw begin ...");
 
-        //     while (!is_quit) {
-        //         UniformBufferObject ubo = {};
-        //         ubo.model = glm::mat4(1.0f);
-        //         ubo.view = camera.view;
-        //         // ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, .0f),
-        //         //                        glm::vec3(0.0f, 0.0f, 0.0f),
-        //         //                        glm::vec3(0.0f, 0.0f, 1.0f));
-        //         ubo.proj = glm::perspective(glm::radians(45.0f),
-        //                                     swapchain.extent.width /
-        //                                         (float)swapchain.extent.height,
-        //                                     0.1f, 10.0f);
-        //         ubo.proj[1][1] *= -1;
+            while (!is_quit) {
+                UniformBufferObject ubo = {};
+                ubo.model = glm::mat4(1.0f);
+                ubo.view = camera.view;
+                // ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, .0f),
+                //                        glm::vec3(0.0f, 0.0f, 0.0f),
+                //                        glm::vec3(0.0f, 0.0f, 1.0f));
+                ubo.proj = glm::perspective(glm::radians(45.0f),
+                                            swapchain.extent.width /
+                                                (float)swapchain.extent.height,
+                                            0.1f, 10.0f);
+                // ubo.proj[1][1] *= -1;
 
-        //         device->copy_to_buffer(&ubo, sizeof(ubo),
-        //                                *uniform_buffer.binding);
-        //         ctx->prepare_buffer();
-        //         device->draw_begin(render_pass.get());
+                device->copy_to_buffer(&ubo, sizeof(ubo),
+                                       *uniform_buffer.binding);
+                ctx->prepare_buffer();
 
-        //         device->bind_pipeline(pipeline.get());
-        //         device->bind_vertex_buffer(vertex_binding);
-        //         device->bind_index_buffer(index_binding);
+                device->draw_begin();
 
-        //         device->draw(indices.size());
+                canvas->stroke_rect({0.0f, 0.0f}, {0.5f, 0.5f}, {0, 0, 255, 255}, 0.01f);
+                // canvas->fill_rect({0.5f, 0.5f}, {1.0f, 1.0f}, {0, 255, 0, 255});
+                // canvas->fill_rect({-0.5f, -0.5f}, {0.5f, 0.5f},
+                //                   {255, 0, 0, 255});
+                canvas->draw();
+                
+                device->bind_pipeline(pipeline.get());
+                device->bind_vertex_buffer(vertex_binding);
+                device->bind_index_buffer(index_binding);
 
-        //         device->draw_end();
-        //         ctx->swap_buffer();
-        //     }
+                device->draw(indices.size());
 
-        device->wait_idle();
-        //     GLOG_I("draw end ...");
-        // });
+                device->draw_end();
 
-        // if (draw_thread.joinable()) {
-        //     draw_thread.join();
-        // }
-        GLOG_I("application end!");
+                ctx->swap_buffer();
+            }
+
+            device->wait_idle();
+            GLOG_I("draw end ...");
+        });
+
         win_mgr->event(my::EventType::EVENT_QUIT)
             .as_blocking()
             .subscribe([&is_quit](const std::shared_ptr<my::Event> &e) {
                 GLOG_I("application quit!");
                 is_quit = true;
             });
-        // stbi_image_free(pixels);
+
+        if (draw_thread.joinable()) {
+            draw_thread.join();
+        }
+        GLOG_I("application end!");
+        stbi_image_free(pixels);
 
     } catch (std::exception &e) {
         GLOG_E(e.what());
