@@ -4,6 +4,8 @@ set(my-gui_SRC
   main.cc
   logger.cc
   window_mgr.cc
+  font_mgr.cc
+  storage_mgr.cc
   draw_list.cc
   vulkan_render_device.cc
   vulkan_ctx.cc
@@ -17,6 +19,7 @@ find_package(SDL2 REQUIRED)
 # find_package(glfw3 REQUIRED)
 find_package(Boost REQUIRED)
 find_package(FFmpeg REQUIRED)
+find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
 
 add_executable(my-gui ${my-gui_SRC})
@@ -29,6 +32,7 @@ target_link_libraries(my-gui
   SDL2::SDL2
   Boost::headers
   ${FFMPEG_LIBRARIES}
+  Freetype::Freetype
   Vulkan::Vulkan
   )
 

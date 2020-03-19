@@ -7,6 +7,7 @@
 #include <SDL2/SDL_vulkan.h>
 
 #include "util.hpp"
+#include "logger.h"
 #include "vulkan_ctx.h"
 
 namespace {
@@ -63,7 +64,7 @@ class SDLWindowMgr : public my::WindowMgr {
             throw std::runtime_error(SDL_GetError());
         }
 
-        auto thread = rxcpp::serialize_event_loop();
+        auto thread = rxcpp::serialize_new_thread();
         rxcpp::observable<>::create<std::shared_ptr<my::Event>>(
             [](rxcpp::subscriber<std::shared_ptr<my::Event>> s) {
                 for (;;) {
@@ -108,7 +109,7 @@ class SDLWindowMgr : public my::WindowMgr {
                 }
             })
             .subscribe_on(thread)
-            .observe_on(thread)
+            // .observe_on(thread)
             .subscribe(
                 [this](const std::shared_ptr<my::Event> &e) {
                     this->_sdl_event.get_subscriber().on_next(e);
@@ -161,8 +162,8 @@ class SDLWindowMgr : public my::WindowMgr {
 
 namespace my {
 WindowMgr *get_window_mgr() {
-    static auto window_mgr = new SDLWindowMgr();
-    return window_mgr;
+    static auto window_mgr = SDLWindowMgr();
+    return &window_mgr;
 }
 } // namespace my
 

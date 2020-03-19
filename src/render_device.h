@@ -41,10 +41,9 @@ class Vertex {
 enum TextureType {};
 
 class Texture {
-    TextureType type;
-    union {
-        glm::vec3 color;
-    };
+  public:
+    Texture();
+    ~Texture() = default;
 };
 
 class Mesh {
@@ -103,17 +102,20 @@ struct VulkanImageBuffer {
     VulkanImageBuffer() = default;
     VulkanImageBuffer(std::shared_ptr<BufferBinding<vk::UniqueImage>> &&binding,
                       vk::UniqueImageView &&image_view,
+                      vk::UniqueDescriptorSet &&desc_set = {},
                       vk::UniqueSampler &&sampler = {})
         : binding(std::move(binding)), image_view(std::move(image_view)),
-          tex_sampler(std::move(sampler)) {}
+          desc_set(std::move(desc_set)), tex_sampler(std::move(sampler)) {}
 
     std::shared_ptr<BufferBinding<vk::UniqueImage>> binding;
     vk::UniqueImageView image_view;
+    vk::UniqueDescriptorSet desc_set;
     vk::UniqueSampler tex_sampler;
 
     VulkanImageBuffer &operator=(VulkanImageBuffer &&buffer) {
         this->binding = std::move(buffer.binding);
         this->image_view = std::move(buffer.image_view);
+        this->desc_set = std::move(buffer.desc_set);
         this->tex_sampler = std::move(buffer.tex_sampler);
         return *this;
     }
@@ -126,14 +128,18 @@ struct VulkanUniformBuffer {
     //     VulkanUniformBuffer
     std::shared_ptr<BufferBinding<vk::UniqueBuffer>> binding;
     vk::DeviceSize size;
+    vk::UniqueDescriptorSet desc_set;
 
   private:
     BOOST_MOVABLE_BUT_NOT_COPYABLE(VulkanUniformBuffer);
 };
 
-class VulkanPipeline {
+struct VulkanPipeline {
     vk::UniquePipeline handle;
     vk::UniquePipelineLayout layout;
+    VulkanPipeline(vk::UniquePipeline &&handle,
+                   vk::UniquePipelineLayout &&layout)
+        : handle(std::move(handle)), layout(std::move(layout)) {}
 };
 
 struct VulkanDrawCtx;
@@ -164,9 +170,10 @@ class RenderDevice {
                   const vk::ShaderStageFlagBits &stage,
                   const std::string &name) = 0;
 
-    virtual vk::UniquePipeline
+    virtual std::shared_ptr<VulkanPipeline>
     create_pipeline(const std::vector<std::shared_ptr<VulkanShader>> &shaders,
                     const VertexDesciption &vertex_desc,
+                    const bool enable_depth_test = true,
                     const std::vector<vk::PushConstantRange>
                         &push_constant_ranges = {}) = 0;
 
@@ -183,10 +190,11 @@ class RenderDevice {
     virtual VulkanUniformBuffer
     create_uniform_buffer(const vk::DeviceSize &size) = 0;
 
-    virtual VulkanImageBuffer create_texture_buffer(void *pixels, size_t w,
-                                                    size_t h) = 0;
+    virtual VulkanImageBuffer
+    create_texture_buffer(void *pixels, size_t w, size_t h,
+                          bool enable_mipmaps = false) = 0;
 
-    virtual void bind_pipeline(const vk::Pipeline &) = 0;
+    virtual void bind_pipeline(my::VulkanPipeline *pipeline) = 0;
 
     virtual void bind_vertex_buffer(
         const std::shared_ptr<BufferBinding<vk::UniqueBuffer>> &) = 0;
@@ -194,7 +202,15 @@ class RenderDevice {
     virtual void bind_index_buffer(
         const std::shared_ptr<BufferBinding<vk::UniqueBuffer>> &) = 0;
 
-    virtual void push_constants() = 0;
+    virtual void bind_uniform_buffer(const VulkanUniformBuffer &,
+                                     const my::VulkanPipeline &pipeline) = 0;
+
+    virtual void bind_texture_buffer(const VulkanImageBuffer &,
+                                     const VulkanPipeline &) = 0;
+
+    virtual void push_constants(vk::PipelineLayout layout,
+                                const vk::ShaderStageFlags &stage,
+                                uint32_t size, void *data) = 0;
 
     virtual void
     copy_to_buffer(void *src, size_t size,
@@ -204,10 +220,15 @@ class RenderDevice {
     virtual void with_draw(const vk::RenderPass &,
                            const VulkanDrawCallback &) = 0;
 
-    virtual void draw(size_t index_count) = 0;
+    virtual void draw(uint32_t index_count, uint32_t instance_count = 1,
+                      uint32_t first_index = 0, int32_t vertex_offset = 0,
+                      uint32_t first_instance = 0) = 0;
 
     virtual void draw_begin() = 0;
     virtual void draw_end() = 0;
+
+    bool enable_depth_test = true;
+    bool enable_sample = true;
 };
 
 std::shared_ptr<RenderDevice> make_vulkan_render_device(VulkanCtx *ctx);

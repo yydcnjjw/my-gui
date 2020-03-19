@@ -2,9 +2,33 @@
 
 #include "logger.h"
 #include "render_device.h"
+#include "vulkan_buffer.hpp"
 #include "vulkan_ctx.h"
 
 namespace {
+
+class VulkanBuffer {
+    vk::UniqueBuffer handle;
+    vk::UniqueDeviceMemory mapping;
+};
+
+class VulkanVertex {};
+
+class VulkanIndex {};
+
+class VulkanTexture : public my::Texture {
+  public:
+    VulkanTexture() {}
+
+    vk::UniqueDeviceMemory mapping;
+    vk::UniqueImageView image_view;
+    vk::UniqueDescriptorSet desc_set;
+    vk::UniqueSampler sampler;
+
+  private:
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(VulkanTexture);
+};
+
 class VulkanRenderDevice : public my::RenderDevice {
   public:
     explicit VulkanRenderDevice(my::VulkanCtx *ctx)
@@ -23,7 +47,6 @@ class VulkanRenderDevice : public my::RenderDevice {
 
         this->_create_descriptor_set_layout();
         this->_create_desciptor_pool();
-        this->_create_descriptor_sets();
 
         this->_render_pass = this->_create_render_pass();
     }
@@ -52,12 +75,6 @@ class VulkanRenderDevice : public my::RenderDevice {
             clear_values.data());
 
         cb.beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
-
-        std::vector<vk::DescriptorSet> descriptor_set = {
-            this->_descriptor_sets[current_buffer_index].get()};
-        cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                              this->_pipeline_layout.get(), 0, descriptor_set,
-                              {});
     }
 
     void draw_end() override {
@@ -70,9 +87,11 @@ class VulkanRenderDevice : public my::RenderDevice {
     void with_draw(const vk::RenderPass &render_pass,
                    const my::VulkanDrawCallback &draw_func) override {}
 
-    void bind_pipeline(const vk::Pipeline &pipeline) override {
+    void bind_pipeline(my::VulkanPipeline *pipeline) override {
+        auto &current_buffer_index = this->_vk_ctx->get_current_buffer_index();
         auto &cb = this->_primary_cmd_buffer.get();
-        cb.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+        cb.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                        pipeline->handle.get());
     };
 
     void bind_vertex_buffer(
@@ -93,14 +112,37 @@ class VulkanRenderDevice : public my::RenderDevice {
                            vk::IndexType::eUint32);
     }
 
-    void push_constants() override {
+    void bind_uniform_buffer(const my::VulkanUniformBuffer &buffer,
+                             const my::VulkanPipeline &pipeline) override {
         auto &cb = this->_primary_cmd_buffer.get();
-        cb.pushConstants(this->_pipeline_layout, , uint32_t offset, ArrayProxy<const T> values)
+
+        cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              pipeline.layout.get(), 0, {buffer.desc_set.get()},
+                              {});
     }
 
-    void draw(size_t index_count) override {
+    void bind_texture_buffer(const my::VulkanImageBuffer &image,
+                             const my::VulkanPipeline &pipeline) override {
         auto &cb = this->_primary_cmd_buffer.get();
-        cb.drawIndexed(index_count, 1, 0, 0, 0);
+        cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                              pipeline.layout.get(), 1, {image.desc_set.get()},
+                              {});
+    }
+
+    void push_constants(vk::PipelineLayout layout,
+                        const vk::ShaderStageFlags &stage, uint32_t size,
+                        void *data) override {
+        auto &cb = this->_primary_cmd_buffer.get();
+        cb.pushConstants(layout, vk::ShaderStageFlagBits::eVertex, 0, size,
+                         data);
+    }
+
+    void draw(uint32_t index_count, uint32_t instance_count,
+              uint32_t first_index, int32_t vertex_offset,
+              uint32_t first_instance) override {
+        auto &cb = this->_primary_cmd_buffer.get();
+        cb.drawIndexed(index_count, instance_count, first_index, vertex_offset,
+                       first_instance);
     }
 
     std::shared_ptr<my::VulkanShader>
@@ -112,9 +154,9 @@ class VulkanRenderDevice : public my::RenderDevice {
     }
 
     // TODO: swapchain dep
-    vk::UniquePipeline create_pipeline(
+    std::shared_ptr<my::VulkanPipeline> create_pipeline(
         const std::vector<std::shared_ptr<my::VulkanShader>> &shaders,
-        const my::VertexDesciption &vertex_desc,
+        const my::VertexDesciption &vertex_desc, bool enable_depth_test,
         const std::vector<vk::PushConstantRange> &push_constant_ranges)
         override {
         std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
@@ -144,38 +186,54 @@ class VulkanRenderDevice : public my::RenderDevice {
             vk::CullModeFlagBits::eBack, vk::FrontFace::eClockwise, VK_FALSE,
             {}, {}, {}, 1.0f);
 
+        // vk::PipelineRasterizationStateCreateInfo rasterization_state(
+        //     {}, VK_FALSE, VK_FALSE, vk::PolygonMode::eFill,
+        //     vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise,
+        //     VK_FALSE,
+        //     {}, {}, {}, 1.0f);
+
         vk::PipelineMultisampleStateCreateInfo multisample_state(
             {}, this->_msaa_samples, VK_FALSE);
 
+        vk::PipelineDepthStencilStateCreateInfo depth_stencil_state = {
+            {},       this->_enable_depth_buffer && enable_depth_test,
+            VK_TRUE,  vk::CompareOp::eLess,
+            VK_FALSE, VK_FALSE};
+
         vk::PipelineColorBlendAttachmentState color_blend_attachment_state(
-            VK_FALSE);
-        color_blend_attachment_state.setColorWriteMask(
+            VK_TRUE, vk::BlendFactor::eSrcAlpha,
+            vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd,
+            vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
             vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+                vk::ColorComponentFlagBits::eB |
+                vk::ColorComponentFlagBits::eA);
 
         vk::PipelineColorBlendStateCreateInfo color_blend_state(
             {}, VK_FALSE, vk::LogicOp::eCopy, 1, &color_blend_attachment_state,
             {0.0f, 0.0f, 0.0f, 0.0f});
 
-        this->_pipeline_layout = this->_device.createPipelineLayoutUnique(
-            vk::PipelineLayoutCreateInfo(
-                {}, 1, &this->_descriptor_set_layout.get(),
-                push_constant_ranges.size(), push_constant_ranges.data()));
+        std::vector<vk::DescriptorSetLayout> layouts;
+        layouts.push_back(
+            this->_descriptor_set_layouts.at(UNIFORM_BUFFER).get());
+        layouts.push_back(
+            this->_descriptor_set_layouts.at(COMBINED_IMAGE_SAMPLER).get());
+
+        auto pipeline_layout = this->_device.createPipelineLayoutUnique(
+            vk::PipelineLayoutCreateInfo({}, layouts.size(), layouts.data(),
+                                         push_constant_ranges.size(),
+                                         push_constant_ranges.data()));
 
         vk::GraphicsPipelineCreateInfo create_info(
             {}, shader_stages.size(), shader_stages.data(), &vertex_input_state,
             &input_assembly_state, {}, &viewport_state, &rasterization_state,
-            &multisample_state, {}, &color_blend_state, {},
-            this->_pipeline_layout.get(), this->_render_pass.get(), 0, {}, {});
+            &multisample_state, &depth_stencil_state, &color_blend_state, {},
+            pipeline_layout.get(), this->_render_pass.get(), 0, {}, {});
 
-        vk::PipelineDepthStencilStateCreateInfo depth_stencil_state;
-        if (this->_enable_depth_buffer) {
-            depth_stencil_state = {
-                {}, VK_TRUE, VK_TRUE, vk::CompareOp::eLess, VK_FALSE, VK_FALSE};
-            create_info.setPDepthStencilState(&depth_stencil_state);
-        }
+        auto pipeline =
+            this->_device.createGraphicsPipelineUnique({}, create_info);
 
-        return this->_device.createGraphicsPipelineUnique({}, create_info);
+        return std::make_shared<my::VulkanPipeline>(std::move(pipeline),
+                                                    std::move(pipeline_layout));
     }
 
     virtual std::shared_ptr<my::BufferBinding<vk::UniqueBuffer>>
@@ -209,18 +267,19 @@ class VulkanRenderDevice : public my::RenderDevice {
         vk::DescriptorBufferInfo buffer_info(buffer_binding->buffer.get(), 0,
                                              buffer_size);
 
-        for (auto i = 0; i < this->_descriptor_sets.size(); i++) {
-            std::vector<vk::WriteDescriptorSet> desc_writes = {
-                vk::WriteDescriptorSet(this->_descriptor_sets[i].get(),
-                                       BindingLayoutIndex::UNIFORM_BUFFER, 0, 1,
-                                       vk::DescriptorType::eUniformBuffer, {},
-                                       &buffer_info)};
-            this->_device.updateDescriptorSets(desc_writes, {});
-        }
-        return {buffer_binding, buffer_size};
+        auto desc_set = this->_create_descriptor_set(UNIFORM_BUFFER);
+        std::vector<vk::WriteDescriptorSet> desc_writes = {
+            vk::WriteDescriptorSet(
+                desc_set.get(),
+                this->_desc_layout_index.at(UNIFORM_BUFFER).bind, 0, 1,
+                vk::DescriptorType::eUniformBuffer, {}, &buffer_info)};
+        this->_device.updateDescriptorSets(desc_writes, {});
+
+        return {buffer_binding, buffer_size, std::move(desc_set)};
     }
     my::VulkanImageBuffer create_texture_buffer(void *pixels, size_t w,
-                                                size_t h) override {
+                                                size_t h,
+                                                bool enable_mipmaps) override {
         vk::DeviceSize img_size = w * h * 4;
         auto staging_buffer_binding = this->_create_buffer(
             img_size, vk::BufferUsageFlagBits::eTransferSrc,
@@ -232,9 +291,8 @@ class VulkanRenderDevice : public my::RenderDevice {
         ::memcpy(data, pixels, img_size);
         this->_device.unmapMemory(staging_buffer_binding->memory.get());
 
-        uint32_t mip_levels = this->_enable_mipmaps
-                                  ? std::floor(std::log2(std::max(w, h))) + 1
-                                  : 1;
+        uint32_t mip_levels =
+            enable_mipmaps ? std::floor(std::log2(std::max(w, h))) + 1 : 1;
         GLOG_D("mip levels %d", mip_levels);
 
         auto buffer_binding = this->_create_image_buffer(
@@ -252,7 +310,7 @@ class VulkanRenderDevice : public my::RenderDevice {
         this->_copy_buffer_to_image(staging_buffer_binding->buffer.get(),
                                     buffer_binding->buffer.get(), w, h);
 
-        if (this->_enable_mipmaps) {
+        if (enable_mipmaps) {
             this->_generate_mipmaps(buffer_binding->buffer.get(),
                                     vk::Format::eR8G8B8A8Unorm, w, h,
                                     mip_levels);
@@ -273,18 +331,17 @@ class VulkanRenderDevice : public my::RenderDevice {
             tex_sampler.get(), image_view.get(),
             vk::ImageLayout::eShaderReadOnlyOptimal);
 
-        for (auto i = 0; i < this->_descriptor_sets.size(); i++) {
-            std::vector<vk::WriteDescriptorSet> desc_writes = {
-                vk::WriteDescriptorSet(
-                    this->_descriptor_sets[i].get(),
-                    BindingLayoutIndex::COMBINED_IMAGE_SAMPLER, 0, 1,
-                    vk::DescriptorType::eCombinedImageSampler, &img_info)};
+        auto desc_set = this->_create_descriptor_set(COMBINED_IMAGE_SAMPLER);
+        std::vector<vk::WriteDescriptorSet> desc_writes = {
+            vk::WriteDescriptorSet(
+                desc_set.get(),
+                this->_desc_layout_index.at(COMBINED_IMAGE_SAMPLER).bind, 0, 1,
+                vk::DescriptorType::eCombinedImageSampler, &img_info)};
 
-            this->_device.updateDescriptorSets(desc_writes, {});
-        }
+        this->_device.updateDescriptorSets(desc_writes, {});
 
         return {std::move(buffer_binding), std::move(image_view),
-                std::move(tex_sampler)};
+                std::move(desc_set), std::move(tex_sampler)};
     }
 
     void
@@ -303,15 +360,19 @@ class VulkanRenderDevice : public my::RenderDevice {
     vk::UniqueCommandBuffer _primary_cmd_buffer;
     my::VulkanDrawCtx _draw_ctx;
 
-    vk::UniquePipelineLayout _pipeline_layout;
+    enum BindingLayout { UNIFORM_BUFFER = 0, COMBINED_IMAGE_SAMPLER = 1 };
+    struct DescriptorSetLayoutIndex {
+        int desc;
+        int bind;
+    };
 
-    enum BindingLayoutIndex { UNIFORM_BUFFER = 0, COMBINED_IMAGE_SAMPLER = 1 };
-    vk::UniqueDescriptorSetLayout _descriptor_set_layout;
-    std::vector<vk::DescriptorSetLayoutBinding> _descriptor_set_layout_binding;
-    vk::UniqueDescriptorPool _descriptor_pool;
-    std::vector<vk::UniqueDescriptorSet> _descriptor_sets;
+    static const std::map<BindingLayout, DescriptorSetLayoutIndex>
+        _desc_layout_index;
 
-    //
+    std::map<BindingLayout, vk::UniqueDescriptorSetLayout>
+        _descriptor_set_layouts;
+    std::map<BindingLayout, vk::UniqueDescriptorPool> _descriptor_pools;
+
     my::VulkanImageBuffer _depth_buffer;
 
     my::VulkanImageBuffer _sample_buffer;
@@ -323,13 +384,8 @@ class VulkanRenderDevice : public my::RenderDevice {
     std::vector<vk::UniqueFramebuffer> _frame_buffers;
 
     // Options
-    // bool _enable_depth_buffer = true;
-    // bool _enable_sample_buffer = true;
-    // bool _enable_mipmaps = true;
-
-    bool _enable_depth_buffer = true;
-    bool _enable_sample_buffer = false;
-    bool _enable_mipmaps = false;
+    bool _enable_depth_buffer = this->enable_depth_test;
+    bool _enable_sample_buffer = this->enable_sample;
 
     vk::UniqueCommandBuffer _create_primary_buffer() {
         // auto count = this->_vk_ctx->get_swapchain().image_count;
@@ -351,7 +407,9 @@ class VulkanRenderDevice : public my::RenderDevice {
 
         auto buffer_binding = this->_create_image_buffer(
             swapchain.extent.width, swapchain.extent.height, format,
-            vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eColorAttachment,
+            vk::ImageTiling::eOptimal,
+            vk::ImageUsageFlagBits::eColorAttachment |
+                vk::ImageUsageFlagBits::eTransientAttachment,
             vk::MemoryPropertyFlagBits::eDeviceLocal, 1, this->_msaa_samples);
 
         auto sample_image_view =
@@ -360,6 +418,23 @@ class VulkanRenderDevice : public my::RenderDevice {
 
         return {std::move(buffer_binding), std::move(sample_image_view)};
     }
+
+    // my::VulkanImageBuffer _create_depth_buffer() {
+    //     vk::Format depth_format = this->_vk_ctx->get_depth_format();
+    //     auto &swapchain = this->_vk_ctx->get_swapchain();
+
+    //     auto buffer_binding = this->_create_image_buffer(
+    //         swapchain.extent.width, swapchain.extent.height, depth_format,
+    //         vk::ImageTiling::eOptimal,
+    //         vk::ImageUsageFlagBits::eDepthStencilAttachment,
+    //         vk::MemoryPropertyFlagBits::eDeviceLocal, 1, this->_msaa_samples);
+
+    //     auto depth_image_view =
+    //         this->_create_image_view(buffer_binding->buffer.get(), depth_format,
+    //                                  vk::ImageAspectFlagBits::eDepth);
+
+    //     return {std::move(buffer_binding), std::move(depth_image_view)};
+    // }
 
     my::VulkanImageBuffer _create_depth_buffer() {
         vk::Format depth_format = this->_vk_ctx->get_depth_format();
@@ -377,6 +452,7 @@ class VulkanRenderDevice : public my::RenderDevice {
 
         return {std::move(buffer_binding), std::move(depth_image_view)};
     }
+    
 
     // TODO: swapchain dep
     std::vector<vk::UniqueFramebuffer>
@@ -690,54 +766,64 @@ class VulkanRenderDevice : public my::RenderDevice {
     void _create_descriptor_set_layout() {
         // TODO:
         vk::DescriptorSetLayoutBinding uniform_layout_binding(
-            BindingLayoutIndex::UNIFORM_BUFFER,
+            this->_desc_layout_index.at(UNIFORM_BUFFER).bind,
             vk::DescriptorType::eUniformBuffer, 1,
             vk::ShaderStageFlagBits::eVertex, {});
         vk::DescriptorSetLayoutBinding sampler_layout_binding(
-            BindingLayoutIndex::COMBINED_IMAGE_SAMPLER,
+            this->_desc_layout_index.at(COMBINED_IMAGE_SAMPLER).bind,
             vk::DescriptorType::eCombinedImageSampler, 1,
             vk::ShaderStageFlagBits::eFragment, {});
-        this->_descriptor_set_layout_binding = {uniform_layout_binding,
-                                                sampler_layout_binding};
 
-        vk::DescriptorSetLayoutCreateInfo create_info(
-            {}, this->_descriptor_set_layout_binding.size(),
-            this->_descriptor_set_layout_binding.data());
+        std::vector<vk::DescriptorSetLayoutBinding> layout_binding0 = {
+            uniform_layout_binding};
+        std::vector<vk::DescriptorSetLayoutBinding> layout_binding1 = {
+            sampler_layout_binding};
 
-        this->_descriptor_set_layout =
-            this->_device.createDescriptorSetLayoutUnique(create_info);
+        this->_descriptor_set_layouts[UNIFORM_BUFFER] =
+            this->_device.createDescriptorSetLayoutUnique(
+                vk::DescriptorSetLayoutCreateInfo({}, layout_binding0.size(),
+                                                  layout_binding0.data()));
+        this->_descriptor_set_layouts[COMBINED_IMAGE_SAMPLER] =
+            this->_device.createDescriptorSetLayoutUnique(
+                vk::DescriptorSetLayoutCreateInfo({}, layout_binding1.size(),
+                                                  layout_binding1.data()));
     }
 
     void _create_desciptor_pool() {
-        std::vector<vk::DescriptorPoolSize> pool_sizes;
-        auto img_count = this->_vk_ctx->get_swapchain().image_count;
-        std::transform(
-            this->_descriptor_set_layout_binding.begin(),
-            this->_descriptor_set_layout_binding.end(),
-            std::back_inserter(pool_sizes),
-            [img_count](const vk::DescriptorSetLayoutBinding &binding) {
-                return vk::DescriptorPoolSize(binding.descriptorType,
-                                              img_count);
-            });
+        std::vector<vk::DescriptorPoolSize> desc_set_0_pool_sizes = {
+            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1)};
+        std::vector<vk::DescriptorPoolSize> desc_set_1_pool_sizes = {
+            vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler,
+                                   10)};
 
-        vk::DescriptorPoolCreateInfo create_info(
-            vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, img_count,
-            pool_sizes.size(), pool_sizes.data());
-
-        this->_descriptor_pool =
-            this->_device.createDescriptorPoolUnique(create_info);
+        this->_descriptor_pools[UNIFORM_BUFFER] =
+            this->_device.createDescriptorPoolUnique(
+                vk::DescriptorPoolCreateInfo(
+                    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1,
+                    desc_set_0_pool_sizes.size(),
+                    desc_set_0_pool_sizes.data()));
+        this->_descriptor_pools[COMBINED_IMAGE_SAMPLER] =
+            this->_device.createDescriptorPoolUnique(
+                vk::DescriptorPoolCreateInfo(
+                    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 10,
+                    desc_set_1_pool_sizes.size(),
+                    desc_set_1_pool_sizes.data()));
     }
 
-    void _create_descriptor_sets() {
-        auto img_count = this->_vk_ctx->get_swapchain().image_count;
+    vk::UniqueDescriptorSet _create_descriptor_set(const BindingLayout &type) {
+        return std::move(this->_create_descriptor_sets(type, 1).front());
+    }
+
+    std::vector<vk::UniqueDescriptorSet>
+    _create_descriptor_sets(const BindingLayout &type, size_t count) {
+
         std::vector<vk::DescriptorSetLayout> layouts(
-            img_count, this->_descriptor_set_layout.get());
+            count, this->_descriptor_set_layouts[type].get());
 
         vk::DescriptorSetAllocateInfo alloc_info(
-            this->_descriptor_pool.get(), layouts.size(), layouts.data());
-
-        this->_descriptor_sets =
-            this->_device.allocateDescriptorSetsUnique(alloc_info);
+            this->_descriptor_pools[type].get(), layouts.size(),
+            layouts.data());
+        return this->_device.allocateDescriptorSetsUnique(alloc_info);
     }
 
     enum AttachmentType { INPUT, COLOR, RESOLVE, DEPTH_STENCIL };
@@ -780,6 +866,9 @@ class VulkanRenderDevice : public my::RenderDevice {
             attachments.push_back(color_attachment);
         }
 
+        subpass.setColorAttachmentCount(color_refs.size());
+        subpass.setPColorAttachments(color_refs.data());
+
         vk::AttachmentReference depth_ref;
         if (this->_enable_depth_buffer) {
             vk::AttachmentDescription depth_attachment(
@@ -795,7 +884,7 @@ class VulkanRenderDevice : public my::RenderDevice {
 
             subpass.setPDepthStencilAttachment(&depth_ref);
         }
-
+        vk::AttachmentReference resolve_ref;
         if (this->_enable_sample_buffer) {
             vk::AttachmentDescription resolve_attachment(
                 {}, swapchain.format, vk::SampleCountFlagBits::e1,
@@ -803,28 +892,12 @@ class VulkanRenderDevice : public my::RenderDevice {
                 vk::AttachmentLoadOp::eDontCare,
                 vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined,
                 vk::ImageLayout::ePresentSrcKHR);
-            vk::AttachmentReference resolve_ref(
-                {static_cast<uint32_t>(attachments.size()),
-                 vk::ImageLayout::eColorAttachmentOptimal});
+            resolve_ref = {static_cast<uint32_t>(attachments.size()),
+                           vk::ImageLayout::eColorAttachmentOptimal};
             attachments.push_back(resolve_attachment);
 
             subpass.setPResolveAttachments(&resolve_ref);
-        } else {
-            // vk::AttachmentDescription color_attachment(
-            //     {}, swapchain.format, vk::SampleCountFlagBits::e1,
-            //     vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
-            //     vk::AttachmentLoadOp::eDontCare,
-            //     vk::AttachmentStoreOp::eDontCare,
-            //     vk::ImageLayout::eUndefined,
-            //     vk::ImageLayout::ePresentSrcKHR);
-
-            // color_refs.push_back({static_cast<uint32_t>(attachments.size()),
-            //                       vk::ImageLayout::eColorAttachmentOptimal});
-            // attachments.push_back(color_attachment);
         }
-
-        subpass.setColorAttachmentCount(color_refs.size());
-        subpass.setPColorAttachments(color_refs.data());
 
         vk::SubpassDependency dep(
             VK_SUBPASS_EXTERNAL, 0,
@@ -842,8 +915,12 @@ class VulkanRenderDevice : public my::RenderDevice {
         this->_frame_buffers = this->_create_frame_buffers(render_pass.get());
         return render_pass;
     }
-
 }; // namespace
+const std::map<VulkanRenderDevice::BindingLayout,
+               VulkanRenderDevice::DescriptorSetLayoutIndex>
+    VulkanRenderDevice::_desc_layout_index = {
+        {VulkanRenderDevice::BindingLayout::UNIFORM_BUFFER, {0, 0}},
+        {VulkanRenderDevice::BindingLayout::COMBINED_IMAGE_SAMPLER, {0, 0}}};
 } // namespace
 namespace my {
 std::shared_ptr<RenderDevice> make_vulkan_render_device(VulkanCtx *ctx) {

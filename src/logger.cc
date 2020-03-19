@@ -37,7 +37,7 @@ Logger::Logger() : _buf(4096, 0) {
             rxcpp::schedulers::run_loop rlp;
             auto rlp_worker = rxcpp::observe_on_run_loop(rlp);
             promise.set_value(&rlp_worker);
-
+            pthread_setname_np(pthread_self(), "logger");
             while (logger->_log_source.get_subscriber().is_subscribed() ||
                    !rlp.empty()) {
                 while (!rlp.empty() && rlp.peek().when < rlp.now()) {

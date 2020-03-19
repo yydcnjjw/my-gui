@@ -15,7 +15,7 @@ constexpr float MOVE_SPEED = 0.01f;
 class Camera {
   public:
     Camera(WindowMgr *win_mgr = nullptr, glm::vec3 postion = {0.0f, 0.0f, 0.0f},
-           glm::vec3 up = {0.0f, 0.0f, 1.0f})
+           glm::vec3 up = {0.0f, 1.0f, 0.0f})
         : _position(postion), _up(up) {
         this->view = glm::lookAt(postion, this->_front, up);
 
@@ -49,7 +49,7 @@ class Camera {
         });
     }
     inline glm::vec3 _get_up(const glm::vec3 &front, const glm::vec3 &right) {
-        return glm::normalize(glm::cross(front, right));
+        return glm::normalize(glm::cross(right, front));
     }
 
     void _subscribe_window_event(WindowMgr *win_mgr) {
@@ -77,7 +77,7 @@ class Camera {
         this->_mouse_pos = e->pos;
 
         this->_yaw += e->xrel * SENSITIVITY;
-        this->_pitch += -e->yrel * SENSITIVITY;
+        this->_pitch += e->yrel * SENSITIVITY;
 
         if (this->_pitch > 89.0f)
             this->_pitch = 89.0f;
@@ -102,44 +102,30 @@ class Camera {
                                            {SDL_SCANCODE_D, 0}};
 
     void _update_keyboard(const std::shared_ptr<my::KeyboardEvent> &e) {
-        if (e->state == SDL_PRESSED) {
-            input_map[e->keysym.scancode] = e->timestamp;
-        } else if (e->state == SDL_RELEASED) {
-            for (const auto &map : input_map) {
-                GLOG_D("%d, %d", map.first, map.second);
-            }
 
-            auto current_timestamp = e->timestamp;
-            GLOG_D("current timestamp %d", current_timestamp);
-
-            if (input_map[SDL_SCANCODE_W]) {
-                auto velocity =
-                    (current_timestamp - input_map[SDL_SCANCODE_W]) *
-                    MOVE_SPEED;
-                this->_position += this->_front * velocity;
-            }
-            if (input_map[SDL_SCANCODE_S]) {
-                auto velocity =
-                    (current_timestamp - input_map[SDL_SCANCODE_S]) *
-                    MOVE_SPEED;
-                this->_position -= this->_front * velocity;
-            }
-            if (input_map[SDL_SCANCODE_A]) {
-                auto velocity =
-                    (current_timestamp - input_map[SDL_SCANCODE_A]) *
-                    MOVE_SPEED;
-                this->_position -= this->_right * velocity;
-            }
-            if (input_map[SDL_SCANCODE_D]) {
-                auto velocity =
-                    (current_timestamp - input_map[SDL_SCANCODE_D]) *
-                    MOVE_SPEED;
-                this->_position += this->_right * velocity;
-            }
-
-            input_map[e->keysym.scancode] = 0;
-            this->_update_view();
+        if (e->state != SDL_PRESSED) {
+            return;
         }
+
+        auto velocity = MOVE_SPEED * 10;
+
+        switch (e->keysym.scancode) {
+        case SDL_SCANCODE_W:
+            this->_position += this->_front * velocity;
+            break;
+        case SDL_SCANCODE_S:
+            this->_position -= this->_front * velocity;
+            break;
+        case SDL_SCANCODE_A:
+            this->_position -= this->_right * velocity;
+            break;
+        case SDL_SCANCODE_D:
+            this->_position += this->_right * velocity;
+            break;
+        default:
+            break;
+        }
+        this->_update_view();
     }
 };
 } // namespace my

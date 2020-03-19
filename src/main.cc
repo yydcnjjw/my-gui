@@ -4,6 +4,7 @@
 #include "camera.hpp"
 #include "canvas.h"
 #include "draw_list.h"
+#include "font_mgr.h"
 #include "render_device.h"
 #include "vulkan_ctx.h"
 #include "window_mgr.h"
@@ -24,7 +25,7 @@
 
 const std::string MODEL_PATH = "models/chalet.obj";
 const std::string TEXTURE_PATH = "textures/chalet.jpg";
-// const std::string TEXTURE_PATH = "textures/texture.jpg";
+const std::string TEXTURE2_PATH = "textures/texture.jpg";
 
 struct UniformBufferObject {
     glm::mat4 model;
@@ -76,11 +77,19 @@ int main(int argc, char *argv[]) {
 
         my::Camera camera(win_mgr);
 
-        int tex_width, tex_height, tex_channels;
-        stbi_uc *pixels = stbi_load(TEXTURE_PATH.c_str(), &tex_width,
-                                    &tex_height, &tex_channels,
-                                    STBI_rgb_alpha);
-        if (!pixels) {
+        int tex1_width, tex1_height, tex1_channels;
+        stbi_uc *pixels1 =
+            stbi_load(TEXTURE_PATH.c_str(), &tex1_width, &tex1_height,
+                      &tex1_channels, STBI_rgb_alpha);
+        if (!pixels1) {
+            throw std::runtime_error("failed to load texture image!");
+        }
+
+        int tex2_width, tex2_height, tex2_channels;
+        stbi_uc *pixels2 =
+            stbi_load(TEXTURE2_PATH.c_str(), &tex2_width, &tex2_height,
+                      &tex2_channels, STBI_rgb_alpha);
+        if (!pixels2) {
             throw std::runtime_error("failed to load texture image!");
         }
 
@@ -91,17 +100,19 @@ int main(int argc, char *argv[]) {
         auto draw_thread = std::thread([&]() {
             auto ctx = my::make_vulkan_ctx(win);
             auto device = my::make_vulkan_render_device(ctx.get());
-            auto canvas = my::make_vulkan_canvas(device.get());
+            auto canvas = my::make_vulkan_canvas(ctx.get(), device.get());
 
             auto vertex_binding = device->create_vertex_buffer(vertices);
 
             auto index_binding = device->create_index_buffer(indices);
 
+            auto texture1_buffer =
+                device->create_texture_buffer(pixels1, tex1_width, tex1_height, true);
+            auto texture2_buffer =
+                device->create_texture_buffer(pixels2, tex2_width, tex2_height, true);
+
             auto uniform_buffer =
                 device->create_uniform_buffer(sizeof(UniformBufferObject));
-
-            auto texture_buffer =
-                device->create_texture_buffer(pixels, tex_width, tex_height);
 
             auto vert_shader = device->create_shader(
                 Util::read_file("shaders/shader.vert.spv"),
@@ -114,49 +125,63 @@ int main(int argc, char *argv[]) {
                 {my::Vertex::get_binding_description()},
                 my::Vertex::get_attribute_descriptions()};
 
-            auto pipeline = device->create_pipeline(
-                {vert_shader, frag_shader}, vertex_desc);
-
+            auto pipeline = device->create_pipeline({vert_shader, frag_shader},
+                                                    vertex_desc);
             auto &swapchain = ctx->get_swapchain();
             GLOG_I("draw begin ...");
 
-            while (!is_quit) {
-                UniformBufferObject ubo = {};
-                ubo.model = glm::mat4(1.0f);
-                ubo.view = camera.view;
-                // ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, .0f),
-                //                        glm::vec3(0.0f, 0.0f, 0.0f),
-                //                        glm::vec3(0.0f, 0.0f, 1.0f));
-                ubo.proj = glm::perspective(glm::radians(45.0f),
-                                            swapchain.extent.width /
-                                                (float)swapchain.extent.height,
-                                            0.1f, 10.0f);
-                // ubo.proj[1][1] *= -1;
+            rxcpp::observable<>::interval(std::chrono::milliseconds(1000 / 60))
+                .take_while([&](int v) { return !is_quit; })
+                .subscribe(
+                    [&](int v) {
+                        UniformBufferObject ubo = {};
+                        ubo.model = glm::mat4(1.0f);
+                        ubo.view = camera.view;
 
-                device->copy_to_buffer(&ubo, sizeof(ubo),
-                                       *uniform_buffer.binding);
-                ctx->prepare_buffer();
+                        ubo.proj =
+                            glm::perspective(glm::radians(45.0f),
+                                             swapchain.extent.width /
+                                                 (float)swapchain.extent.height,
+                                             0.1f, 10.0f);
+                        // ubo.proj[1][1] *= -1;
+                        device->copy_to_buffer(&ubo, sizeof(ubo),
+                                               *uniform_buffer.binding);
+                        ctx->prepare_buffer();
 
-                device->draw_begin();
+                        device->draw_begin();
 
-                canvas->stroke_rect({0.0f, 0.0f}, {0.5f, 0.5f}, {0, 0, 255, 255}, 0.01f);
-                // canvas->fill_rect({0.5f, 0.5f}, {1.0f, 1.0f}, {0, 255, 0, 255});
-                // canvas->fill_rect({-0.5f, -0.5f}, {0.5f, 0.5f},
-                //                   {255, 0, 0, 255});
-                canvas->draw();
-                
-                device->bind_pipeline(pipeline.get());
-                device->bind_vertex_buffer(vertex_binding);
-                device->bind_index_buffer(index_binding);
+                        device->bind_pipeline(pipeline.get());
+                        device->bind_vertex_buffer(vertex_binding);
+                        device->bind_index_buffer(index_binding);
+                        device->bind_uniform_buffer(uniform_buffer, *pipeline);
+                        device->bind_texture_buffer(texture1_buffer, *pipeline);
 
-                device->draw(indices.size());
+                        device->draw(indices.size());
 
-                device->draw_end();
+                        canvas->draw_image(&texture1_buffer, {500, 100},
+                                           {600, 200});
+                        canvas->draw_image(&texture1_buffer, {600, 200},
+                                           {700, 300});
+                        canvas->stroke_rect({50, 50}, {100, 100},
+                                            {0, 0, 255, 255});
+                        canvas->fill_rect({100, 100}, {300, 300},
+                                          {0, 255, 0, 255});
 
-                ctx->swap_buffer();
-            }
+                        canvas->draw_image(&texture2_buffer, {300, 300},
+                                           {600, 600}, 100);
+                        canvas->draw_image(&texture1_buffer, {400, 400},
+                                           {500, 500});
+                        canvas->draw_image(&texture2_buffer, {450, 450},
+                                           {500, 500});
 
-            device->wait_idle();
+                        canvas->fill_text("Hello World!", {100, 100});
+                        canvas->draw();
+
+                        device->draw_end();
+
+                        ctx->swap_buffer();
+                    },
+                    [&]() { device->wait_idle(); });
             GLOG_I("draw end ...");
         });
 
@@ -171,8 +196,8 @@ int main(int argc, char *argv[]) {
             draw_thread.join();
         }
         GLOG_I("application end!");
-        stbi_image_free(pixels);
-
+        stbi_image_free(pixels1);
+        stbi_image_free(pixels2);
     } catch (std::exception &e) {
         GLOG_E(e.what());
     }
