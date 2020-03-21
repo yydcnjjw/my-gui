@@ -65,7 +65,7 @@ template <class T> struct BufferBinding {
 
 class VulkanShader {
   public:
-    VulkanShader(const vk::Device &device, const std::vector<char> &code,
+    VulkanShader(const vk::Device &device, const std::string &code,
                  const vk::ShaderStageFlagBits &stage, std::string name)
         : _shader(my::VulkanShader::_create_shader_module(device, code)),
           _stage(stage), _name(std::move(name)),
@@ -83,8 +83,7 @@ class VulkanShader {
     vk::PipelineShaderStageCreateInfo _create_info;
 
     static vk::UniqueShaderModule
-    _create_shader_module(const vk::Device &device,
-                          const std::vector<char> &code) {
+    _create_shader_module(const vk::Device &device, const std::string &code) {
         vk::ShaderModuleCreateInfo create_info(
             {}, code.size(), reinterpret_cast<const uint32_t *>(code.data()));
 
@@ -124,11 +123,12 @@ struct VulkanImageBuffer {
     BOOST_MOVABLE_BUT_NOT_COPYABLE(VulkanImageBuffer);
 };
 struct VulkanUniformBuffer {
-    // public:
-    //     VulkanUniformBuffer
-    std::shared_ptr<BufferBinding<vk::UniqueBuffer>> binding;
-    vk::DeviceSize size;
+    std::shared_ptr<BufferBinding<vk::UniqueBuffer>> share_binding;
+    std::shared_ptr<BufferBinding<vk::UniqueBuffer>> dynamic_binding;
     vk::UniqueDescriptorSet desc_set;
+    vk::DeviceSize share_size;
+    vk::DeviceSize dynamic_size;
+    vk::DeviceSize dynamic_align;
 
   private:
     BOOST_MOVABLE_BUT_NOT_COPYABLE(VulkanUniformBuffer);
@@ -166,8 +166,7 @@ class RenderDevice {
     virtual ~RenderDevice() = default;
 
     virtual std::shared_ptr<VulkanShader>
-    create_shader(const std::vector<char> &code,
-                  const vk::ShaderStageFlagBits &stage,
+    create_shader(const std::string &code, const vk::ShaderStageFlagBits &stage,
                   const std::string &name) = 0;
 
     virtual std::shared_ptr<VulkanPipeline>
@@ -188,7 +187,9 @@ class RenderDevice {
     create_index_buffer(const std::vector<uint32_t> &indices) = 0;
 
     virtual VulkanUniformBuffer
-    create_uniform_buffer(const vk::DeviceSize &size) = 0;
+    create_uniform_buffer(const uint64_t &share_size,
+                          const uint64_t &per_obj_size,
+                          const uint64_t &num) = 0;
 
     virtual VulkanImageBuffer
     create_texture_buffer(void *pixels, size_t w, size_t h,
@@ -203,6 +204,7 @@ class RenderDevice {
         const std::shared_ptr<BufferBinding<vk::UniqueBuffer>> &) = 0;
 
     virtual void bind_uniform_buffer(const VulkanUniformBuffer &,
+                                     const uint64_t &object_index,
                                      const my::VulkanPipeline &pipeline) = 0;
 
     virtual void bind_texture_buffer(const VulkanImageBuffer &,
@@ -216,6 +218,10 @@ class RenderDevice {
     copy_to_buffer(void *src, size_t size,
                    const my::BufferBinding<vk::UniqueBuffer> &bind) = 0;
 
+    virtual void map_memory(const my::BufferBinding<vk::UniqueBuffer> &bind,
+                            uint64_t size,
+                            const std::function<void(void *map)>&) = 0;
+
     virtual void wait_idle() = 0;
     virtual void with_draw(const vk::RenderPass &,
                            const VulkanDrawCallback &) = 0;
@@ -226,6 +232,8 @@ class RenderDevice {
 
     virtual void draw_begin() = 0;
     virtual void draw_end() = 0;
+
+    virtual VulkanImageBuffer *get_depth_buffer() = 0;
 
     bool enable_depth_test = true;
     bool enable_sample = true;

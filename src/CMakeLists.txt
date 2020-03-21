@@ -7,6 +7,7 @@ set(my-gui_SRC
   font_mgr.cc
   storage_mgr.cc
   draw_list.cc
+  aio.cc
   vulkan_render_device.cc
   vulkan_ctx.cc
   vulkan_canvas.cc
@@ -17,7 +18,7 @@ find_package(Threads REQUIRED)
 find_package(rxcpp CONFIG)
 find_package(SDL2 REQUIRED)
 # find_package(glfw3 REQUIRED)
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS thread)
 find_package(FFmpeg REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
@@ -30,7 +31,8 @@ target_link_libraries(my-gui
   glm
   rxcpp
   SDL2::SDL2
-  Boost::headers
+  # Boost::headers
+  Boost::thread
   ${FFMPEG_LIBRARIES}
   Freetype::Freetype
   Vulkan::Vulkan

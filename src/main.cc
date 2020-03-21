@@ -1,11 +1,11 @@
-#include "logger.h"
-#include "util.hpp"
-
+#include "aio.h"
 #include "camera.hpp"
 #include "canvas.h"
 #include "draw_list.h"
 #include "font_mgr.h"
+#include "logger.h"
 #include "render_device.h"
+#include "util.hpp"
 #include "vulkan_ctx.h"
 #include "window_mgr.h"
 
@@ -28,9 +28,18 @@ const std::string TEXTURE_PATH = "textures/chalet.jpg";
 const std::string TEXTURE2_PATH = "textures/texture.jpg";
 
 struct UniformBufferObject {
-    glm::mat4 model;
     glm::mat4 view;
     glm::mat4 proj;
+};
+
+struct UniformBufferPerObject {
+    glm::mat4 model;
+};
+
+struct PushConstBlock {
+    float roughness;
+    float metallic;
+    float r, g, b;
 };
 
 void load_model(std::vector<my::Vertex> &vertices,
@@ -106,19 +115,19 @@ int main(int argc, char *argv[]) {
 
             auto index_binding = device->create_index_buffer(indices);
 
-            auto texture1_buffer =
-                device->create_texture_buffer(pixels1, tex1_width, tex1_height, true);
-            auto texture2_buffer =
-                device->create_texture_buffer(pixels2, tex2_width, tex2_height, true);
+            auto texture1_buffer = device->create_texture_buffer(
+                pixels1, tex1_width, tex1_height, true);
+            auto texture2_buffer = device->create_texture_buffer(
+                pixels2, tex2_width, tex2_height, true);
 
-            auto uniform_buffer =
-                device->create_uniform_buffer(sizeof(UniformBufferObject));
+            auto uniform_buffer = device->create_uniform_buffer(
+                sizeof(UniformBufferObject), sizeof(UniformBufferPerObject), 2);
 
             auto vert_shader = device->create_shader(
-                Util::read_file("shaders/shader.vert.spv"),
+                my::aio::file_read_all("shaders/shader.vert.spv").get(),
                 vk::ShaderStageFlagBits ::eVertex, "main");
             auto frag_shader = device->create_shader(
-                Util::read_file("shaders/shader.frag.spv"),
+                my::aio::file_read_all("shaders/shader.frag.spv").get(),
                 vk::ShaderStageFlagBits ::eFragment, "main");
 
             my::VertexDesciption vertex_desc = {
@@ -126,16 +135,27 @@ int main(int argc, char *argv[]) {
                 my::Vertex::get_attribute_descriptions()};
 
             auto pipeline = device->create_pipeline({vert_shader, frag_shader},
-                                                    vertex_desc);
+                                                    vertex_desc, true);
             auto &swapchain = ctx->get_swapchain();
             GLOG_I("draw begin ...");
 
-            rxcpp::observable<>::interval(std::chrono::milliseconds(1000 / 60))
+            std::vector<UniformBufferPerObject> dubos{
+                {glm::mat4(1.0f)},
+                {glm::translate(glm::mat4(1.0f), {1.0f, 2.0f, 1.0f})}};
+            device->map_memory(
+                *uniform_buffer.dynamic_binding, uniform_buffer.dynamic_size,
+                [&](void *dst) {
+                    for (const auto &ubo : dubos) {
+                        memcpy(dst, &ubo.model, sizeof(ubo.model));
+                        dst = (uint8_t *)dst + uniform_buffer.dynamic_align;
+                    }
+                });
+
+            rxcpp::observable<>::interval(std::chrono::milliseconds(1000 / 30))
                 .take_while([&](int v) { return !is_quit; })
                 .subscribe(
                     [&](int v) {
                         UniformBufferObject ubo = {};
-                        ubo.model = glm::mat4(1.0f);
                         ubo.view = camera.view;
 
                         ubo.proj =
@@ -143,9 +163,9 @@ int main(int argc, char *argv[]) {
                                              swapchain.extent.width /
                                                  (float)swapchain.extent.height,
                                              0.1f, 10.0f);
-                        // ubo.proj[1][1] *= -1;
                         device->copy_to_buffer(&ubo, sizeof(ubo),
-                                               *uniform_buffer.binding);
+                                               *uniform_buffer.share_binding);
+
                         ctx->prepare_buffer();
 
                         device->draw_begin();
@@ -153,28 +173,17 @@ int main(int argc, char *argv[]) {
                         device->bind_pipeline(pipeline.get());
                         device->bind_vertex_buffer(vertex_binding);
                         device->bind_index_buffer(index_binding);
-                        device->bind_uniform_buffer(uniform_buffer, *pipeline);
                         device->bind_texture_buffer(texture1_buffer, *pipeline);
 
+                        device->bind_uniform_buffer(uniform_buffer, 0,
+                                                    *pipeline);
                         device->draw(indices.size());
 
-                        canvas->draw_image(&texture1_buffer, {500, 100},
-                                           {600, 200});
-                        canvas->draw_image(&texture1_buffer, {600, 200},
-                                           {700, 300});
-                        canvas->stroke_rect({50, 50}, {100, 100},
-                                            {0, 0, 255, 255});
-                        canvas->fill_rect({100, 100}, {300, 300},
-                                          {0, 255, 0, 255});
+                        device->bind_uniform_buffer(uniform_buffer, 1,
+                                                    *pipeline);
+                        device->draw(indices.size());
 
-                        canvas->draw_image(&texture2_buffer, {300, 300},
-                                           {600, 600}, 100);
-                        canvas->draw_image(&texture1_buffer, {400, 400},
-                                           {500, 500});
-                        canvas->draw_image(&texture2_buffer, {450, 450},
-                                           {500, 500});
-
-                        canvas->fill_text("Hello World!", {100, 100});
+                        canvas->fill_text("Hello World!", {0, 0});
                         canvas->draw();
 
                         device->draw_end();
@@ -188,13 +197,13 @@ int main(int argc, char *argv[]) {
         win_mgr->event(my::EventType::EVENT_QUIT)
             .as_blocking()
             .subscribe([&is_quit](const std::shared_ptr<my::Event> &e) {
-                GLOG_I("application quit!");
                 is_quit = true;
             });
 
         if (draw_thread.joinable()) {
             draw_thread.join();
         }
+
         GLOG_I("application end!");
         stbi_image_free(pixels1);
         stbi_image_free(pixels2);

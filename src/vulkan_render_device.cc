@@ -34,6 +34,8 @@ class VulkanRenderDevice : public my::RenderDevice {
     explicit VulkanRenderDevice(my::VulkanCtx *ctx)
         : _vk_ctx(ctx), _device(ctx->get_device()),
           _primary_cmd_buffer(this->_create_primary_buffer()) {
+        this->_create_descriptor_set_layout();
+        this->_create_desciptor_pool();
 
         if (this->_enable_sample_buffer) {
             GLOG_D("enable sample buffer");
@@ -44,10 +46,6 @@ class VulkanRenderDevice : public my::RenderDevice {
             GLOG_D("enable depth buffer");
             this->_depth_buffer = this->_create_depth_buffer();
         }
-
-        this->_create_descriptor_set_layout();
-        this->_create_desciptor_pool();
-
         this->_render_pass = this->_create_render_pass();
     }
 
@@ -113,12 +111,13 @@ class VulkanRenderDevice : public my::RenderDevice {
     }
 
     void bind_uniform_buffer(const my::VulkanUniformBuffer &buffer,
+                             const uint64_t &object_index,
                              const my::VulkanPipeline &pipeline) override {
         auto &cb = this->_primary_cmd_buffer.get();
-
+        uint32_t dynamic_offset = object_index * buffer.dynamic_align;
         cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                               pipeline.layout.get(), 0, {buffer.desc_set.get()},
-                              {});
+                              {dynamic_offset});
     }
 
     void bind_texture_buffer(const my::VulkanImageBuffer &image,
@@ -146,8 +145,7 @@ class VulkanRenderDevice : public my::RenderDevice {
     }
 
     std::shared_ptr<my::VulkanShader>
-    create_shader(const std::vector<char> &code,
-                  const vk::ShaderStageFlagBits &stage,
+    create_shader(const std::string &code, const vk::ShaderStageFlagBits &stage,
                   const std::string &name) override {
         return std::make_shared<my::VulkanShader>(this->_device, code, stage,
                                                   name);
@@ -213,10 +211,10 @@ class VulkanRenderDevice : public my::RenderDevice {
             {0.0f, 0.0f, 0.0f, 0.0f});
 
         std::vector<vk::DescriptorSetLayout> layouts;
-        layouts.push_back(
-            this->_descriptor_set_layouts.at(UNIFORM_BUFFER).get());
-        layouts.push_back(
-            this->_descriptor_set_layouts.at(COMBINED_IMAGE_SAMPLER).get());
+        std::transform(this->_descriptor_set_layouts.begin(),
+                       this->_descriptor_set_layouts.end(),
+                       std::back_inserter(layouts),
+                       [](const auto &layout) { return layout.get(); });
 
         auto pipeline_layout = this->_device.createPipelineLayoutUnique(
             vk::PipelineLayoutCreateInfo({}, layouts.size(), layouts.data(),
@@ -258,24 +256,54 @@ class VulkanRenderDevice : public my::RenderDevice {
     }
 
     my::VulkanUniformBuffer
-    create_uniform_buffer(const vk::DeviceSize &buffer_size) override {
-        auto buffer_binding = this->_create_buffer(
-            buffer_size, vk::BufferUsageFlagBits::eUniformBuffer,
+    create_uniform_buffer(const uint64_t &share_size,
+                          const uint64_t &per_obj_size,
+                          const uint64_t &num) override {
+
+        auto share_buffer_binding = this->_create_buffer(
+            share_size, vk::BufferUsageFlagBits::eUniformBuffer,
             vk::MemoryPropertyFlagBits::eHostVisible |
                 vk::MemoryPropertyFlagBits::eHostCoherent);
 
-        vk::DescriptorBufferInfo buffer_info(buffer_binding->buffer.get(), 0,
-                                             buffer_size);
+        auto min_ubo_align = this->_vk_ctx->get_physical_device()
+                                 .getProperties()
+                                 .limits.minUniformBufferOffsetAlignment;
+        GLOG_D("uniform buffer min align %d", min_ubo_align);
+        auto dynamic_align = per_obj_size;
+        if (min_ubo_align > 0) {
+            dynamic_align =
+                (dynamic_align + min_ubo_align - 1) & ~(min_ubo_align - 1);
+        }
 
-        auto desc_set = this->_create_descriptor_set(UNIFORM_BUFFER);
+        auto dynamic_size = num * dynamic_align;
+        GLOG_D("uniform buffer dynamic size %d", dynamic_size);
+        auto per_obj_buffer_binding =
+            this->_create_buffer(dynamic_size, vk::BufferUsageFlagBits::eUniformBuffer,
+                                 vk::MemoryPropertyFlagBits::eHostVisible);
+
+        auto desc_set = this->_create_descriptor_set(
+            DescriptorSetIndex::UNIFORM_BUFFER_INDEX);
+
+        vk::DescriptorBufferInfo share_buffer_info(
+            share_buffer_binding->buffer.get(), 0, VK_WHOLE_SIZE);
+        vk::DescriptorBufferInfo dynamic_buffer_info(
+            per_obj_buffer_binding->buffer.get(), 0, VK_WHOLE_SIZE);
+
         std::vector<vk::WriteDescriptorSet> desc_writes = {
             vk::WriteDescriptorSet(
                 desc_set.get(),
                 this->_desc_layout_index.at(UNIFORM_BUFFER).bind, 0, 1,
-                vk::DescriptorType::eUniformBuffer, {}, &buffer_info)};
+                vk::DescriptorType::eUniformBuffer, {}, &share_buffer_info),
+            vk::WriteDescriptorSet(
+                desc_set.get(),
+                this->_desc_layout_index.at(UNIFORM_DYNAMIC_BUFFER).bind, 0, 1,
+                vk::DescriptorType::eUniformBufferDynamic, {},
+                &dynamic_buffer_info)};
         this->_device.updateDescriptorSets(desc_writes, {});
 
-        return {buffer_binding, buffer_size, std::move(desc_set)};
+        return {share_buffer_binding, per_obj_buffer_binding,
+                std::move(desc_set),  share_size,
+                dynamic_size,         dynamic_align};
     }
     my::VulkanImageBuffer create_texture_buffer(void *pixels, size_t w,
                                                 size_t h,
@@ -331,7 +359,8 @@ class VulkanRenderDevice : public my::RenderDevice {
             tex_sampler.get(), image_view.get(),
             vk::ImageLayout::eShaderReadOnlyOptimal);
 
-        auto desc_set = this->_create_descriptor_set(COMBINED_IMAGE_SAMPLER);
+        auto desc_set =
+            this->_create_descriptor_set(DescriptorSetIndex::SAMPLE_INDEX);
         std::vector<vk::WriteDescriptorSet> desc_writes = {
             vk::WriteDescriptorSet(
                 desc_set.get(),
@@ -347,12 +376,23 @@ class VulkanRenderDevice : public my::RenderDevice {
     void
     copy_to_buffer(void *src, size_t size,
                    const my::BufferBinding<vk::UniqueBuffer> &bind) override {
+        this->map_memory(bind, size,
+                         [&](void *dst) { ::memcpy(dst, src, size); });
+    }
+
+    void map_memory(const my::BufferBinding<vk::UniqueBuffer> &bind,
+                    uint64_t size,
+                    const std::function<void(void *map)> &func) override {
         void *dst = this->_device.mapMemory(bind.memory.get(), 0, size);
-        ::memcpy(dst, src, size);
+        func(dst);
         this->_device.unmapMemory(bind.memory.get());
     }
 
     void wait_idle() override { this->_device.waitIdle(); };
+
+    my::VulkanImageBuffer *get_depth_buffer() override {
+        return &this->_depth_buffer;
+    }
 
   private:
     my::VulkanCtx *_vk_ctx;
@@ -360,7 +400,17 @@ class VulkanRenderDevice : public my::RenderDevice {
     vk::UniqueCommandBuffer _primary_cmd_buffer;
     my::VulkanDrawCtx _draw_ctx;
 
-    enum BindingLayout { UNIFORM_BUFFER = 0, COMBINED_IMAGE_SAMPLER = 1 };
+    enum DescriptorSetIndex {
+        UNIFORM_BUFFER_INDEX,
+        SAMPLE_INDEX,
+        DESCRIPTOR_SET_END
+    };
+
+    enum BindingLayout {
+        UNIFORM_BUFFER,
+        UNIFORM_DYNAMIC_BUFFER,
+        COMBINED_IMAGE_SAMPLER
+    };
     struct DescriptorSetLayoutIndex {
         int desc;
         int bind;
@@ -369,9 +419,8 @@ class VulkanRenderDevice : public my::RenderDevice {
     static const std::map<BindingLayout, DescriptorSetLayoutIndex>
         _desc_layout_index;
 
-    std::map<BindingLayout, vk::UniqueDescriptorSetLayout>
-        _descriptor_set_layouts;
-    std::map<BindingLayout, vk::UniqueDescriptorPool> _descriptor_pools;
+    std::vector<vk::UniqueDescriptorSetLayout> _descriptor_set_layouts;
+    std::vector<vk::UniqueDescriptorPool> _descriptor_pools;
 
     my::VulkanImageBuffer _depth_buffer;
 
@@ -419,23 +468,6 @@ class VulkanRenderDevice : public my::RenderDevice {
         return {std::move(buffer_binding), std::move(sample_image_view)};
     }
 
-    // my::VulkanImageBuffer _create_depth_buffer() {
-    //     vk::Format depth_format = this->_vk_ctx->get_depth_format();
-    //     auto &swapchain = this->_vk_ctx->get_swapchain();
-
-    //     auto buffer_binding = this->_create_image_buffer(
-    //         swapchain.extent.width, swapchain.extent.height, depth_format,
-    //         vk::ImageTiling::eOptimal,
-    //         vk::ImageUsageFlagBits::eDepthStencilAttachment,
-    //         vk::MemoryPropertyFlagBits::eDeviceLocal, 1, this->_msaa_samples);
-
-    //     auto depth_image_view =
-    //         this->_create_image_view(buffer_binding->buffer.get(), depth_format,
-    //                                  vk::ImageAspectFlagBits::eDepth);
-
-    //     return {std::move(buffer_binding), std::move(depth_image_view)};
-    // }
-
     my::VulkanImageBuffer _create_depth_buffer() {
         vk::Format depth_format = this->_vk_ctx->get_depth_format();
         auto &swapchain = this->_vk_ctx->get_swapchain();
@@ -452,7 +484,6 @@ class VulkanRenderDevice : public my::RenderDevice {
 
         return {std::move(buffer_binding), std::move(depth_image_view)};
     }
-    
 
     // TODO: swapchain dep
     std::vector<vk::UniqueFramebuffer>
@@ -769,21 +800,31 @@ class VulkanRenderDevice : public my::RenderDevice {
             this->_desc_layout_index.at(UNIFORM_BUFFER).bind,
             vk::DescriptorType::eUniformBuffer, 1,
             vk::ShaderStageFlagBits::eVertex, {});
+
+        vk::DescriptorSetLayoutBinding uniform_dynamic_layout_binding(
+            this->_desc_layout_index.at(UNIFORM_DYNAMIC_BUFFER).bind,
+            vk::DescriptorType::eUniformBufferDynamic, 1,
+            vk::ShaderStageFlagBits::eVertex, {});
+
         vk::DescriptorSetLayoutBinding sampler_layout_binding(
             this->_desc_layout_index.at(COMBINED_IMAGE_SAMPLER).bind,
             vk::DescriptorType::eCombinedImageSampler, 1,
             vk::ShaderStageFlagBits::eFragment, {});
 
         std::vector<vk::DescriptorSetLayoutBinding> layout_binding0 = {
-            uniform_layout_binding};
+            uniform_layout_binding, uniform_dynamic_layout_binding};
+
         std::vector<vk::DescriptorSetLayoutBinding> layout_binding1 = {
             sampler_layout_binding};
+        this->_descriptor_set_layouts.resize(
+            DescriptorSetIndex::DESCRIPTOR_SET_END);
 
-        this->_descriptor_set_layouts[UNIFORM_BUFFER] =
+        this->_descriptor_set_layouts
+            [DescriptorSetIndex::UNIFORM_BUFFER_INDEX] =
             this->_device.createDescriptorSetLayoutUnique(
                 vk::DescriptorSetLayoutCreateInfo({}, layout_binding0.size(),
                                                   layout_binding0.data()));
-        this->_descriptor_set_layouts[COMBINED_IMAGE_SAMPLER] =
+        this->_descriptor_set_layouts[DescriptorSetIndex::SAMPLE_INDEX] =
             this->_device.createDescriptorSetLayoutUnique(
                 vk::DescriptorSetLayoutCreateInfo({}, layout_binding1.size(),
                                                   layout_binding1.data()));
@@ -791,18 +832,20 @@ class VulkanRenderDevice : public my::RenderDevice {
 
     void _create_desciptor_pool() {
         std::vector<vk::DescriptorPoolSize> desc_set_0_pool_sizes = {
-            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1)};
+            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1),
+            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBufferDynamic,
+                                   1)};
         std::vector<vk::DescriptorPoolSize> desc_set_1_pool_sizes = {
             vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler,
                                    10)};
-
-        this->_descriptor_pools[UNIFORM_BUFFER] =
+        this->_descriptor_pools.resize(DescriptorSetIndex::DESCRIPTOR_SET_END);
+        this->_descriptor_pools[DescriptorSetIndex::UNIFORM_BUFFER_INDEX] =
             this->_device.createDescriptorPoolUnique(
                 vk::DescriptorPoolCreateInfo(
                     vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1,
                     desc_set_0_pool_sizes.size(),
                     desc_set_0_pool_sizes.data()));
-        this->_descriptor_pools[COMBINED_IMAGE_SAMPLER] =
+        this->_descriptor_pools[DescriptorSetIndex::SAMPLE_INDEX] =
             this->_device.createDescriptorPoolUnique(
                 vk::DescriptorPoolCreateInfo(
                     vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 10,
@@ -810,12 +853,13 @@ class VulkanRenderDevice : public my::RenderDevice {
                     desc_set_1_pool_sizes.data()));
     }
 
-    vk::UniqueDescriptorSet _create_descriptor_set(const BindingLayout &type) {
+    vk::UniqueDescriptorSet
+    _create_descriptor_set(const DescriptorSetIndex &type) {
         return std::move(this->_create_descriptor_sets(type, 1).front());
     }
 
     std::vector<vk::UniqueDescriptorSet>
-    _create_descriptor_sets(const BindingLayout &type, size_t count) {
+    _create_descriptor_sets(const DescriptorSetIndex &type, size_t count) {
 
         std::vector<vk::DescriptorSetLayout> layouts(
             count, this->_descriptor_set_layouts[type].get());
@@ -920,7 +964,8 @@ const std::map<VulkanRenderDevice::BindingLayout,
                VulkanRenderDevice::DescriptorSetLayoutIndex>
     VulkanRenderDevice::_desc_layout_index = {
         {VulkanRenderDevice::BindingLayout::UNIFORM_BUFFER, {0, 0}},
-        {VulkanRenderDevice::BindingLayout::COMBINED_IMAGE_SAMPLER, {0, 0}}};
+        {VulkanRenderDevice::BindingLayout::UNIFORM_DYNAMIC_BUFFER, {0, 1}},
+        {VulkanRenderDevice::BindingLayout::COMBINED_IMAGE_SAMPLER, {1, 0}}};
 } // namespace
 namespace my {
 std::shared_ptr<RenderDevice> make_vulkan_render_device(VulkanCtx *ctx) {

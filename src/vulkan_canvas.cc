@@ -1,5 +1,6 @@
 #include "canvas.h"
 
+#include "aio.h"
 #include "draw_list.h"
 #include "render_device.h"
 #include "util.hpp"
@@ -11,10 +12,10 @@ class VulkanCanvas : public my::Canvas {
         : _vk_ctx(ctx), _render_device(device) {
 
         auto vert_shader = this->_render_device->create_shader(
-            Util::read_file("shaders/canvas_shader.vert.spv"),
+            my::aio::file_read_all("shaders/canvas_shader.vert.spv").get(),
             vk::ShaderStageFlagBits ::eVertex, "main");
         auto frag_shader = this->_render_device->create_shader(
-            Util::read_file("shaders/canvas_shader.frag.spv"),
+            my::aio::file_read_all("shaders/canvas_shader.frag.spv").get(),
             vk::ShaderStageFlagBits ::eFragment, "main");
 
         my::VertexDesciption vertex_desc = {
