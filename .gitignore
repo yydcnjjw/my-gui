@@ -2,6 +2,7 @@ debug/
 cmake-build-debug/
 .ccls-cache/
 .idea/
+assets/
 
 .directory
 compile_commands.json

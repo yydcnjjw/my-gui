@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 2.8.2)
+
+project(glm NONE)
+
+include(ExternalProject)
+ExternalProject_Add(glm
+  GIT_REPOSITORY https://github.com/g-truc/glm.git
+  GIT_TAG master
+  SOURCE_DIR "${DEPS_DIR}/glm/glm-src"
+  BINARY_DIR "${DEPS_DIR}/glm/glm-build"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${DEPS_DIR} -DGLM_TEST_ENABLE=OFF
+  # CONFIGURE_COMMAND ""
+  # BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+)

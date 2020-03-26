@@ -16,7 +16,7 @@ class VulkanVertex {};
 
 class VulkanIndex {};
 
-class VulkanTexture : public my::Texture {
+class VulkanTexture {
   public:
     VulkanTexture() {}
 

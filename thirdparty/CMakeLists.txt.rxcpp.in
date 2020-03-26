@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 2.8.2)
+
+project(rxcpp NONE)
+include(ExternalProject)
+
+ExternalProject_Add(RxCpp
+  GIT_REPOSITORY https://github.com/ReactiveX/RxCpp.git
+  GIT_TAG master
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${DEPS_DIR}
+  SOURCE_DIR ${DEPS_DIR}/rxcpp/rxcpp-src
+  BINARY_DIR ${DEPS_DIR}/rxcpp/rxcpp-build
+  BUILD_COMMAND ""
+  )

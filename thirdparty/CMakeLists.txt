@@ -1,20 +1,30 @@
-set(thirdparty_path ${PROJECT_SOURCE_DIR}/thirdparty)
+# googtest
+configure_file(CMakeLists.txt.googletest.in
+               googletest/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY ${DEPS_DIR}/googletest)
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+  WORKING_DIRECTORY ${DEPS_DIR}/googletest)
 
-option(GLM_TEST_ENABLE "Build unit tests" OFF)
-add_subdirectory(glm)
+# Prevent GoogleTest from overriding our compiler/linker options
+# when building with Visual Studio
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(GTest_DIR ${DEPS_DIR}/lib/cmake/GTest CACHE INTERNAL "")
 
-add_subdirectory(googletest)
+# rxcpp
+configure_file(CMakeLists.txt.rxcpp.in
+               rxcpp/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY ${DEPS_DIR}/rxcpp)
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+  WORKING_DIRECTORY ${DEPS_DIR}/rxcpp)
+set(rxcpp_DIR ${DEPS_DIR}/share/rxcpp/cmake CACHE INTERNAL "")
 
-# list(APPEND CMAKE_PREFIX_PATH ${thirdparty_path}/spdlog)
-# add_custom_target(third_party)
-# include(ExternalProject)
-
-# ExternalProject_Add(RxCpp
-#         GIT_REPOSITORY https://github.com/ReactiveX/RxCpp.git
-#         GIT_TAG master
-#         SOURCE_DIR ${DEPS_DIR}/RxCpp/RxCpp-src
-#         BINARY_DIR ${DEPS_DIR}/RxCpp/RxCpp-build
-#         CONFIGURE_COMMAND ""
-#         )
-
-# add_dependencies(third_party RxCpp)
+# glm
+configure_file(CMakeLists.txt.glm.in
+               glm/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY ${DEPS_DIR}/glm)
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+  WORKING_DIRECTORY ${DEPS_DIR}/glm)
+set(glm_DIR ${DEPS_DIR}/glm/glm-src/cmake/glm CACHE INTERNAL "")

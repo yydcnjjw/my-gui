@@ -40,16 +40,9 @@ class Vertex {
 
 enum TextureType {};
 
-class Texture {
-  public:
-    Texture();
-    ~Texture() = default;
-};
-
 class Mesh {
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
-    std::vector<Texture> textures;
 };
 
 template <class T> struct BufferBinding {

@@ -12,10 +12,10 @@ class VulkanCanvas : public my::Canvas {
         : _vk_ctx(ctx), _render_device(device) {
 
         auto vert_shader = this->_render_device->create_shader(
-            my::aio::file_read_all("shaders/canvas_shader.vert.spv").get(),
+            my::aio::file_read_all("../assets/shaders/canvas_shader.vert.spv").get(),
             vk::ShaderStageFlagBits ::eVertex, "main");
         auto frag_shader = this->_render_device->create_shader(
-            my::aio::file_read_all("shaders/canvas_shader.frag.spv").get(),
+            my::aio::file_read_all("../assets/shaders/canvas_shader.frag.spv").get(),
             vk::ShaderStageFlagBits ::eFragment, "main");
 
         my::VertexDesciption vertex_desc = {
@@ -31,7 +31,7 @@ class VulkanCanvas : public my::Canvas {
 
         my::FontMgr *font_mgr = my::get_font_mgr();
         this->_default_font =
-            font_mgr->add_font("fonts/NotoSansCJK-Regular.ttc");
+            font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
         auto font_pixels = this->_default_font->get_tex_as_rgb32(&w, &h);
         assert(font_pixels);
         GLOG_D("w = %d h = %d", w, h);

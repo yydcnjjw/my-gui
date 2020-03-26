@@ -110,7 +110,7 @@ void DrawList::_restore() {
 
 void DrawList::_prim_rect(const glm::vec2 &a, const glm::vec2 &c,
                           const glm::u8vec4 &col) {
-    this->_prim_rect_uv(a, c, {0, 0}, {0, 0});
+    this->_prim_rect_uv(a, c, {0, 0}, {0, 0}, col);
 }
 
 void DrawList::_prim_rect_uv(const glm::vec2 &a, const glm::vec2 &c,
@@ -143,11 +143,8 @@ void DrawList::_add_poly_line(const DrawPath &path, const glm::u8vec4 &col,
 
     size_t count = point_count - 1;
 
-    const size_t idx_count = count * 6;
-    const size_t vtx_count = count * 4;
-
-    for (auto i = 0; i < count; ++i) {
-        const int i2 = i + 1;
+    for (size_t i = 0; i < count; ++i) {
+        const auto i2 = i + 1;
         assert(i2 < point_count);
         size_t current_idx = this->_vtx_list.size();
 
@@ -187,16 +184,16 @@ void DrawList::_add_convex_poly_fill(const DrawPath &path,
 
     glm::vec2 uv;
 
-    const size_t idx_count = (point_count - 2) * 3;
+    // const size_t idx_count = (point_count - 2) * 3;
     const size_t vtx_count = point_count;
 
     size_t current_idx = this->_vtx_list.size();
 
-    for (auto i = 0; i < vtx_count; ++i) {
+    for (size_t i = 0; i < vtx_count; ++i) {
         this->_vtx_list.push_back({path._points[i], uv, col});
     }
 
-    for (auto i = 2; i < point_count; i++) {
+    for (size_t i = 2; i < point_count; i++) {
         this->_idx_list.push_back(current_idx);
         this->_idx_list.push_back(current_idx + i - 1);
         this->_idx_list.push_back(current_idx + i);

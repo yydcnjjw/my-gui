@@ -33,7 +33,7 @@ class Camera {
     glm::vec3 _front{0.0f, 0.0f, 0.0f};
     glm::vec3 _right{this->_get_right(this->_front)};
 
-    Position _mouse_pos;
+    PixelPos _mouse_pos;
     float _yaw{0.0f};
     float _pitch{0.0f};
 
@@ -53,16 +53,16 @@ class Camera {
     }
 
     void _subscribe_window_event(WindowMgr *win_mgr) {
-        win_mgr->event(EventType::EVENT_MOUSE_MOTION)
-            .subscribe([this](const std::shared_ptr<my::Event> &e) {
-                this->_update_mouse_motion(
-                    std::static_pointer_cast<my::MouseMotionEvent>(e));
-            });
-        win_mgr->event(EventType::EVENT_KEYBOARD)
-            .subscribe([this](const std::shared_ptr<my::Event> &e) {
-                this->_update_keyboard(
-                    std::static_pointer_cast<my::KeyboardEvent>(e));
-            });
+        // win_mgr->event(EventType::EVENT_MOUSE_MOTION)
+        //     .subscribe([this](const std::shared_ptr<my::Event> &e) {
+        //         this->_update_mouse_motion(
+        //             std::static_pointer_cast<my::MouseMotionEvent>(e));
+        //     });
+        // win_mgr->event(EventType::EVENT_KEYBOARD)
+        //     .subscribe([this](const std::shared_ptr<my::Event> &e) {
+        //         this->_update_keyboard(
+        //             std::static_pointer_cast<my::KeyboardEvent>(e));
+        //     });
     }
 
     void _update_view() {

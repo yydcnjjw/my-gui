@@ -1,11 +1,19 @@
+set(COMPILE_FLAGS "-Wall -Wextra -ggdb3 -Fsanitize=Address")
+
+set(CMAKE_C_FLAGS ${COMPILE_FLAGS})
+set(CMAKE_CXX_FLAGS ${COMPILE_FLAGS})
+
 include_directories(vulkan)
 
 set(my-gui_SRC
   main.cc
+  application.cc
   logger.cc
   window_mgr.cc
+  render_server.cc
+  event_bus.cc
   font_mgr.cc
-  storage_mgr.cc
+  resource_mgr.cc
   draw_list.cc
   aio.cc
   vulkan_render_device.cc
@@ -15,43 +23,54 @@ set(my-gui_SRC
   )
 
 find_package(Threads REQUIRED)
-find_package(rxcpp CONFIG)
+find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
 # find_package(glfw3 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS thread)
-find_package(FFmpeg REQUIRED)
+find_package(Boost REQUIRED COMPONENTS thread program_options)
+find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(glm CONFIG)
 
-add_executable(my-gui ${my-gui_SRC})
-target_link_libraries(my-gui
+set(DEPS
   Threads::Threads
   ${CMAKE_DL_LIBS}
   # glfw
-  glm
+  glm::glm
   rxcpp
   SDL2::SDL2
   # Boost::headers
   Boost::thread
+  Boost::program_options
   ${FFMPEG_LIBRARIES}
   Freetype::Freetype
-  Vulkan::Vulkan
-  )
+  Vulkan::Vulkan)
 
+add_executable(my-gui ${my-gui_SRC})
+target_link_libraries(my-gui
+  ${DEPS}
+  )
+# add_library(my-gui_lib SHARED ${my-gui_SRC})
+# target_link_libraries(my-gui_lib
+  # ${DEPS}
+  # )
+
+set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
+set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)
 file(GLOB shaders
-  vulkan/shaders/shader.vert
-  vulkan/shaders/shader.frag
-  vulkan/shaders/canvas_shader.vert
-  vulkan/shaders/canvas_shader.frag)
+  ${PROJECT_SHADER_PATH}/shader.vert
+  ${PROJECT_SHADER_PATH}/shader.frag
+  ${PROJECT_SHADER_PATH}/canvas_shader.vert
+  ${PROJECT_SHADER_PATH}/canvas_shader.frag)
 
 set(GLSL_VALIDATOR "/bin/glslangValidator")
 
 foreach(glsl ${shaders})
   get_filename_component(file_name ${glsl} NAME)
-  set(spirv ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/${file_name}.spv)
+  set(spirv ${PROJECT_SHADER_PATH}/${file_name}.spv)
   add_custom_command(
     OUTPUT ${spirv}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders/
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SHADER_PATH}
     COMMAND ${GLSL_VALIDATOR} -V ${glsl} -o ${spirv}
     DEPENDS ${glsl})
   list(APPEND spirv_binary_files ${spirv})
@@ -62,3 +81,5 @@ add_custom_target(
   DEPENDS ${spirv_binary_files})
 
 add_dependencies(my-gui shaders)
+
+file(COPY ${PROJECT_ASSETS_PATH} DESTINATION ${DEPLOY_DIR})

@@ -1,6 +1,8 @@
-# find_package(GTest REQUIRED)
-# enable_testing()
+find_package(GTest CONFIG REQUIRED)
 
-# add_test()
-add_executable(test test.cc)
-target_link_libraries(test gtest_main)
+if(GTest_FOUND)
+  add_executable(test test.cc)
+  target_link_libraries(test
+    GTest::gtest_main
+    )
+endif(GTest_FOUND)

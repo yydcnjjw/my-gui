@@ -293,10 +293,10 @@ class MyVulkanCtx : public my::VulkanCtx {
             throw std::runtime_error(
                 "failed to find GPUs with Vulkan support!");
         }
-
-        for (const auto &device : physical_device) {
-            // TODO: pick suitable device
-        }
+        // TODO: pick suitable device
+        // for (const auto &device : physical_device) {
+            
+        // }
 
         this->_physical_device = physical_device.front();
     }

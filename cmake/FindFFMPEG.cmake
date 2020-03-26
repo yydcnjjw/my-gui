@@ -19,13 +19,13 @@
 
 include(FindPackageHandleStandardArgs)
 
-    find_package_handle_standard_args(FFMPEG
-        FOUND_VAR FFMPEG_FOUND
-        REQUIRED_VARS
-            FFMPEG_LIBRARY
-            FFMPEG_INCLUDE_DIR
-        VERSION_VAR FFMPEG_VERSION
-    )
+    # find_package_handle_standard_args(FFMPEG
+    #     FOUND_VAR FFMPEG_FOUND
+    #     REQUIRED_VARS
+    #         FFMPEG_LIBRARY
+    #         FFMPEG_INCLUDE_DIR
+    #     VERSION_VAR FFMPEG_VERSION
+    # )
 
 if(FFMPEG_LIBRARIES AND FFMPEG_INCLUDE_DIR)
   # in cache already

@@ -6,8 +6,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
-#include "util.hpp"
 #include "logger.h"
+#include "util.hpp"
 #include "vulkan_ctx.h"
 
 namespace {
@@ -59,74 +59,57 @@ class SDLWindow : public my::Window {
 class SDLWindowMgr : public my::WindowMgr {
 
   public:
-    SDLWindowMgr() {
+    SDLWindowMgr(my::EventBus *bus) {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
 
-        auto thread = rxcpp::serialize_new_thread();
-        rxcpp::observable<>::create<std::shared_ptr<my::Event>>(
-            [](rxcpp::subscriber<std::shared_ptr<my::Event>> s) {
-                for (;;) {
-                    SDL_Event sdl_event = {};
-                    SDL_PollEvent(&sdl_event);
+        this->_win_mgr_thread = std::thread([bus]() {
+            pthread_setname_np(pthread_self(), "win mgr");
+            GLOG_D("window loop running!");
+            bool is_exit = false;
+            while (!is_exit) {
+                SDL_Event sdl_event{};
+                SDL_WaitEvent(&sdl_event);
 
-                    my::Event *event = nullptr;
-                    switch (sdl_event.type) {
-                    case SDL_QUIT:
-                        event = new my::Event{my::EventType::EVENT_QUIT,
-                                              sdl_event.quit.timestamp};
-                        break;
-                    case SDL_MOUSEMOTION:
-                        event = new my::MouseMotionEvent{
-                            my::EventType::EVENT_MOUSE_MOTION,
-                            sdl_event.motion.timestamp,
-                            {sdl_event.motion.x, sdl_event.motion.y},
-                            sdl_event.motion.xrel,
-                            sdl_event.motion.yrel,
-                            sdl_event.motion.state,
-                        };
-                        break;
-                    case SDL_KEYUP:
-                    case SDL_KEYDOWN:
-                        event = new my::KeyboardEvent{
-                            my::EventType::EVENT_KEYBOARD,
-                            sdl_event.key.timestamp, sdl_event.key.state,
-                            sdl_event.key.repeat != 0, sdl_event.key.keysym};
-                        break;
-                    default:
-                        break;
-                    }
-                    if (!event) {
-                        continue;
-                    }
-                    auto ptr = std::shared_ptr<my::Event>(event);
-                    s.on_next(ptr);
-                    if (ptr->type == my::EventType::EVENT_QUIT) {
-                        s.on_completed();
-                        break;
-                    }
+                switch (sdl_event.type) {
+                case SDL_QUIT:
+                    bus->notify<my::QuitEvent>();
+                    is_exit = true;
+                    break;
+                case SDL_MOUSEMOTION:
+                    bus->notify<my::MouseMotionEvent>(
+                        {my::PixelPos{sdl_event.motion.x, sdl_event.motion.y},
+                         sdl_event.motion.xrel, sdl_event.motion.yrel,
+                         sdl_event.motion.state});
+                    break;
+                case SDL_KEYUP:
+                case SDL_KEYDOWN:
+                    bus->notify<my::KeyboardEvent>({sdl_event.key.state,
+                                                    sdl_event.key.repeat != 0,
+                                                    sdl_event.key.keysym});
+                    break;
+                default:
+                    break;
                 }
-            })
-            .subscribe_on(thread)
-            // .observe_on(thread)
-            .subscribe(
-                [this](const std::shared_ptr<my::Event> &e) {
-                    this->_sdl_event.get_subscriber().on_next(e);
-                },
-                [this](rxcpp::rxu::error_ptr e) {
-                    this->_sdl_event.get_subscriber().on_error(e);
-                },
-                [this]() { this->_sdl_event.get_subscriber().on_completed(); });
+            }
+            GLOG_D("window loop exit!");
+        });
     }
 
-    ~SDLWindowMgr() { SDL_Quit(); }
+    ~SDLWindowMgr() {
+        SDL_Quit();
+        if (this->_win_mgr_thread.joinable()) {
+            this->_win_mgr_thread.join();
+        }
+    }
     my::Window *create_window(const std::string &title, uint32_t w,
                               uint32_t h) override {
         // TODO: 考虑 继承
         SDL_Window *sdl_win = SDL_CreateWindow(
             title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w,
-            h, SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI);
+            h,
+            SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI);
 
         if (sdl_win == nullptr) {
             throw std::runtime_error(SDL_GetError());
@@ -137,32 +120,18 @@ class SDLWindowMgr : public my::WindowMgr {
         return win_ptr;
     }
 
-    void remove_window(my::Window *win) override {
-        windows.erase(win);
-    }
-
-    rxcpp::observable<std::shared_ptr<my::Event>> get_observable() override {
-        return _sdl_event.get_observable();
-    };
-
-    rxcpp::observable<std::shared_ptr<my::Event>>
-    event(const my::EventType &type) override {
-        return this->get_observable().filter(
-            [type](const std::shared_ptr<my::Event> &e) {
-                return e->type == type;
-            });
-    }
+    void remove_window(my::Window *win) override { windows.erase(win); }
 
   private:
     std::map<my::Window *, std::unique_ptr<SDLWindow>> windows;
-    rxcpp::subjects::subject<std::shared_ptr<my::Event>> _sdl_event;
+    std::thread _win_mgr_thread;
 };
 
 } // namespace
 
 namespace my {
-WindowMgr *get_window_mgr() {
-    static auto window_mgr = SDLWindowMgr();
+WindowMgr *get_window_mgr(EventBus *ev_bus) {
+    static auto window_mgr = SDLWindowMgr(ev_bus);
     return &window_mgr;
 }
 } // namespace my
