@@ -295,7 +295,7 @@ class MyVulkanCtx : public my::VulkanCtx {
         }
         // TODO: pick suitable device
         // for (const auto &device : physical_device) {
-            
+
         // }
 
         this->_physical_device = physical_device.front();
@@ -638,7 +638,7 @@ class MyVulkanCtx : public my::VulkanCtx {
 } // namespace
 
 namespace my {
-std::shared_ptr<VulkanCtx> make_vulkan_ctx(Window *win) {
-    return std::make_shared<MyVulkanCtx>(win);
+std::unique_ptr<VulkanCtx> VulkanCtx::create(Window *win) {
+    return std::make_unique<MyVulkanCtx>(win);
 }
 } // namespace my

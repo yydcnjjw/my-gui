@@ -32,39 +32,42 @@ struct VulkanSwapchain {
     vk::Extent2D extent;
     vk::PresentModeKHR present_mode;
 };
-    
+
 class RenderDevice;
+class Window;
 class VulkanCtx {
   public:
     VulkanCtx() = default;
     virtual ~VulkanCtx() = default;
-    
+
+    static std::unique_ptr<VulkanCtx> create(Window *win);
+
     virtual const vk::Device &get_device() = 0;
     virtual const vk::PhysicalDevice &get_physical_device() = 0;
-    
+
     virtual uint32_t
     find_memory_type(uint32_t type_filter,
                      const vk::MemoryPropertyFlags &properties) = 0;
-    
+
     virtual vk::Format get_depth_format() const = 0;
-    
+
     virtual const vk::Queue &get_queue(const VulkanQueueType &) = 0;
-    
+
     virtual const vk::CommandPool &
     get_command_pool(const VulkanCommandPoolType &) = 0;
-    
+
     virtual const VulkanSwapchain &get_swapchain() const = 0;
-    
+
     virtual void prepare_buffer() = 0;
-    
+
     virtual void sumit_command_buffer(const vk::CommandBuffer &cb) = 0;
-    
+
     virtual void swap_buffer() = 0;
     virtual const uint32_t &get_current_buffer_index() const = 0;
 
     virtual vk::SampleCountFlagBits get_max_usable_sample_count() const = 0;
 };
-class Window;
+
 std::shared_ptr<VulkanCtx> make_vulkan_ctx(Window *);
 
 } // namespace my

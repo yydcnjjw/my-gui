@@ -1,17 +1,15 @@
 #include "application.h"
 
-#include "event_bus.hpp"
 #include "logger.h"
 #include "window_mgr.h"
-
-#include <boost/program_options.hpp>
 
 namespace {
 namespace program_options = boost::program_options;
 class PosixApplication : public my::Application {
   public:
     PosixApplication(int argc, char *argv[])
-        : Application(argc, argv), _ev_bus(std::make_unique<my::EventBus>()) {
+        : Application(argc, argv), _ev_bus(std::make_unique<my::EventBus>()),
+          _win_mgr(my::WindowMgr::create(this->_ev_bus.get())) {
         pthread_setname_np(pthread_self(), "main");
         this->_parse_program_options(argc, argv);
     }
@@ -20,32 +18,33 @@ class PosixApplication : public my::Application {
 
     void run() override {
         try {
-            auto win_mgr = my::get_window_mgr(this->_ev_bus.get());
-            auto win = win_mgr->create_window("Test", 800, 600);
+            auto win = this->_win_mgr->create_window("Test", 800, 600);
 
             this->_ev_bus->on_event<my::MouseMotionEvent>()
                 .observe_on(this->_ev_bus->ev_bus_worker())
                 .subscribe(
                     [](std::shared_ptr<my::Event<my::MouseMotionEvent>> e) {
-                        GLOG_D("pos x = %d y = %d", e->data->pos.x, e->data->pos.y);
+                        GLOG_D("pos x = %d y = %d", e->data->pos.x,
+                               e->data->pos.y);
                     });
 
             this->_ev_bus->run();
         } catch (std::exception &e) {
             GLOG_E(e.what());
         }
-        // auto t = std::thread([this]() {
-        //     std::this_thread::sleep_for(std::chrono::seconds(1));
-        // });
+    }
 
-        // if (t.joinable()) {
-        //     t.join();
-        // }
+    my::EventBus *get_ev_bus() const override { return this->_ev_bus.get(); }
+
+    const program_options::variable_value &
+    get_program_option_value(const std::string &option) const override {
+        return this->_program_option_map[option];
     }
 
   private:
     program_options::variables_map _program_option_map;
     std::unique_ptr<my::EventBus> _ev_bus;
+    std::unique_ptr<my::WindowMgr> _win_mgr;
 
     void _parse_program_options(int argc, char *argv[]) {
         program_options::options_description desc("options");
@@ -53,6 +52,7 @@ class PosixApplication : public my::Application {
             program_options::parse_command_line(argc, argv, desc),
             this->_program_option_map);
         program_options::notify(this->_program_option_map);
+        auto a = this->_program_option_map["aaa"];
     }
 };
 } // namespace

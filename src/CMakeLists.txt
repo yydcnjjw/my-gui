@@ -4,7 +4,7 @@ set(CMAKE_C_FLAGS ${COMPILE_FLAGS})
 set(CMAKE_CXX_FLAGS ${COMPILE_FLAGS})
 
 include_directories(vulkan)
-
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(my-gui_SRC
   main.cc
   application.cc
@@ -19,6 +19,7 @@ set(my-gui_SRC
   vulkan_render_device.cc
   vulkan_ctx.cc
   vulkan_canvas.cc
+  storage/xp3_archive.cc
   # vulkan/window.cpp
   )
 
@@ -26,11 +27,12 @@ find_package(Threads REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
 # find_package(glfw3 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS thread program_options)
+find_package(Boost REQUIRED COMPONENTS thread program_options iostreams)
 find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glm CONFIG)
+find_package(ZLIB REQUIRED)
 
 set(DEPS
   Threads::Threads
@@ -42,18 +44,21 @@ set(DEPS
   # Boost::headers
   Boost::thread
   Boost::program_options
+  Boost::iostreams
   ${FFMPEG_LIBRARIES}
   Freetype::Freetype
-  Vulkan::Vulkan)
+  Vulkan::Vulkan
+  # ZLIB::ZLIB
+  )
 
 add_executable(my-gui ${my-gui_SRC})
 target_link_libraries(my-gui
   ${DEPS}
   )
-# add_library(my-gui_lib SHARED ${my-gui_SRC})
-# target_link_libraries(my-gui_lib
-  # ${DEPS}
-  # )
+add_library(my-gui_lib SHARED ${my-gui_SRC})
+target_link_libraries(my-gui_lib
+  ${DEPS}
+  )
 
 set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
 set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)

@@ -12,6 +12,8 @@ class Canvas {
     Canvas() = default;
     virtual ~Canvas() = default;
 
+    static std::shared_ptr<Canvas> create();
+    
     virtual void fill_rect(const glm::vec2 &a, const glm::vec2 &b,
                            const glm::u8vec4 &) = 0;
 
@@ -30,8 +32,5 @@ class Canvas {
 
     virtual void draw() = 0;
 };
-
-std::shared_ptr<Canvas> make_vulkan_canvas(VulkanCtx *ctx,
-                                           RenderDevice *device);
 
 } // namespace my

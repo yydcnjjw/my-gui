@@ -1,9 +1,29 @@
 #pragma once
 
-#include "vulkan_ctx.h"
 #include "event_bus.hpp"
+#include "vulkan_ctx.h"
 
 namespace my {
+
+typedef glm::i32vec2 PixelPos;    
+struct MouseMotionEvent {
+    PixelPos pos;
+    int32_t xrel;
+    int32_t yrel;
+    uint32_t state;
+
+    MouseMotionEvent(PixelPos pos, int32_t xrel, int32_t yrel, uint32_t state)
+        : pos(pos), xrel(xrel), yrel(yrel), state(state) {}
+};
+
+struct KeyboardEvent {
+    uint8_t state;
+    bool repeat;
+    SDL_Keysym keysym;
+    KeyboardEvent(uint8_t state, bool repeat, SDL_Keysym keysym)
+        : state(state), repeat(repeat), keysym(keysym) {}
+};
+    
 class Window : public VulkanPlatformSurface {
   public:
     virtual ~Window() = default;
@@ -26,8 +46,8 @@ class WindowMgr {
     virtual Window *create_window(const std::string &title, uint32_t w,
                                   uint32_t h) = 0;
     virtual void remove_window(Window *) = 0;
-};
 
-WindowMgr *get_window_mgr(EventBus *);
+    static std::unique_ptr<WindowMgr> create(EventBus *);
+};
 
 } // namespace my

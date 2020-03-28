@@ -6,16 +6,51 @@
 #include "util.hpp"
 
 namespace {
+
+class GPUCanvas : public my::Canvas {
+  public:
+    void fill_rect(const glm::vec2 &a, const glm::vec2 &b,
+                   const glm::u8vec4 &col) override {
+        this->_draw_list.fill_rect(a, b, col);
+    }
+
+    void stroke_rect(const glm::vec2 &a, const glm::vec2 &b,
+                     const glm::u8vec4 &col, float line_width) override {
+        this->_draw_list.stroke_rect(a, b, col, line_width);
+    }
+
+    void draw_image(my::TextureID id, const glm::vec2 &p_min,
+                    const glm::vec2 &p_max, uint8_t alpha = 255,
+                    const glm::vec2 &uv_min = {0, 0},
+                    const glm::vec2 &uv_max = {1, 1}) override {
+        this->_draw_list.draw_image(id, p_min, p_max, uv_min, uv_max, alpha);
+    }
+
+    void fill_text(const char *text, const glm::vec2 &pos, float font_size,
+                   const glm::u8vec4 &color, my::Font *font) override {
+        if (!font) {
+            font = this->_default_font;
+        }
+        this->_draw_list.fill_text(text, pos, font, font_size, color);
+    }
+
+  private:
+    my::DrawList _draw_list;
+    my::Font *_default_font;
+};
+
 class VulkanCanvas : public my::Canvas {
   public:
     VulkanCanvas(my::VulkanCtx *ctx, my::RenderDevice *device)
         : _vk_ctx(ctx), _render_device(device) {
 
         auto vert_shader = this->_render_device->create_shader(
-            my::aio::file_read_all("../assets/shaders/canvas_shader.vert.spv").get(),
+            my::aio::file_read_all("../assets/shaders/canvas_shader.vert.spv")
+                .get(),
             vk::ShaderStageFlagBits ::eVertex, "main");
         auto frag_shader = this->_render_device->create_shader(
-            my::aio::file_read_all("../assets/shaders/canvas_shader.frag.spv").get(),
+            my::aio::file_read_all("../assets/shaders/canvas_shader.frag.spv")
+                .get(),
             vk::ShaderStageFlagBits ::eFragment, "main");
 
         my::VertexDesciption vertex_desc = {

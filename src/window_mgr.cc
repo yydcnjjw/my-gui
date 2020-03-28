@@ -74,20 +74,20 @@ class SDLWindowMgr : public my::WindowMgr {
 
                 switch (sdl_event.type) {
                 case SDL_QUIT:
-                    bus->notify<my::QuitEvent>();
+                    bus->post<my::QuitEvent>();
                     is_exit = true;
                     break;
                 case SDL_MOUSEMOTION:
-                    bus->notify<my::MouseMotionEvent>(
-                        {my::PixelPos{sdl_event.motion.x, sdl_event.motion.y},
-                         sdl_event.motion.xrel, sdl_event.motion.yrel,
-                         sdl_event.motion.state});
+                    bus->post<my::MouseMotionEvent>(
+                        my::PixelPos{sdl_event.motion.x, sdl_event.motion.y},
+                        sdl_event.motion.xrel, sdl_event.motion.yrel,
+                        sdl_event.motion.state);
                     break;
                 case SDL_KEYUP:
                 case SDL_KEYDOWN:
-                    bus->notify<my::KeyboardEvent>({sdl_event.key.state,
-                                                    sdl_event.key.repeat != 0,
-                                                    sdl_event.key.keysym});
+                    bus->post<my::KeyboardEvent>(sdl_event.key.state,
+                                                   sdl_event.key.repeat != 0,
+                                                   sdl_event.key.keysym);
                     break;
                 default:
                     break;
@@ -130,9 +130,8 @@ class SDLWindowMgr : public my::WindowMgr {
 } // namespace
 
 namespace my {
-WindowMgr *get_window_mgr(EventBus *ev_bus) {
-    static auto window_mgr = SDLWindowMgr(ev_bus);
-    return &window_mgr;
+std::unique_ptr<WindowMgr> WindowMgr::create(EventBus *bus) {
+    return std::make_unique<SDLWindowMgr>(bus);
 }
 } // namespace my
 

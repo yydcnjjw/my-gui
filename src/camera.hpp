@@ -6,6 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include "event_bus.hpp"
 #include "logger.h"
 #include "window_mgr.h"
 
@@ -14,14 +15,13 @@ constexpr float SENSITIVITY = 0.1f;
 constexpr float MOVE_SPEED = 0.01f;
 class Camera {
   public:
-    Camera(WindowMgr *win_mgr = nullptr, glm::vec3 postion = {0.0f, 0.0f, 0.0f},
+    Camera(EventBus *bus, glm::vec3 postion = {0.0f, 0.0f, 0.0f},
            glm::vec3 up = {0.0f, 1.0f, 0.0f})
         : _position(postion), _up(up) {
         this->view = glm::lookAt(postion, this->_front, up);
 
-        if (win_mgr) {
-            this->_subscribe_window_event(win_mgr);
-        }
+        assert(bus);
+        this->_subscribe_event(bus);
     }
 
     glm::mat4 perspective;
@@ -52,17 +52,21 @@ class Camera {
         return glm::normalize(glm::cross(right, front));
     }
 
-    void _subscribe_window_event(WindowMgr *win_mgr) {
-        // win_mgr->event(EventType::EVENT_MOUSE_MOTION)
-        //     .subscribe([this](const std::shared_ptr<my::Event> &e) {
-        //         this->_update_mouse_motion(
-        //             std::static_pointer_cast<my::MouseMotionEvent>(e));
-        //     });
-        // win_mgr->event(EventType::EVENT_KEYBOARD)
-        //     .subscribe([this](const std::shared_ptr<my::Event> &e) {
-        //         this->_update_keyboard(
-        //             std::static_pointer_cast<my::KeyboardEvent>(e));
-        //     });
+    void _subscribe_event(EventBus *bus) {
+        bus->on_event<MouseMotionEvent>()
+            .subscribe_on(bus->ev_bus_worker())
+            .observe_on(bus->ev_bus_worker())
+            .subscribe(
+                [this](const std::shared_ptr<Event<MouseMotionEvent>> &e) {
+                    this->_update_mouse_motion(e->data);
+                });
+        bus->on_event<KeyboardEvent>()
+            .subscribe_on(bus->ev_bus_worker())
+            .observe_on(bus->ev_bus_worker())
+            .subscribe(
+                [this](const std::shared_ptr<my::Event<KeyboardEvent>> &e) {
+                    this->_update_keyboard(e->data);
+                });
     }
 
     void _update_view() {

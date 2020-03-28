@@ -41,25 +41,14 @@ template <typename T> class Event : public IEvent {
     std::shared_ptr<T> data;
 };
 
-typedef glm::i32vec2 PixelPos;
 struct QuitEvent {};
-struct MouseMotionEvent {
-    PixelPos pos;
-    int32_t xrel;
-    int32_t yrel;
-    uint32_t state;
-};
-
-struct KeyboardEvent {
-    uint8_t state;
-    bool repeat;
-    SDL_Keysym keysym;
-};
-
+    
 class EventBus {
   public:
-    EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {}
-
+   EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {
+        
+    }
+    
     template <typename T> auto on_event() -> decltype(auto) {
         std::unique_lock<std::mutex> local_lock(this->_lock);
         return this->_event_suject.get_observable()
@@ -68,19 +57,14 @@ class EventBus {
             })
             .map([](const std::shared_ptr<IEvent> &e) {
                 return std::dynamic_pointer_cast<Event<T>>(e);
-            })
-            .subscribe_on(this->_ev_bus_worker);
+            });
     }
 
-    template <typename T, typename... Args> void notify(T &&t) {
-        notify(std::make_shared<T>(std::forward(t)));
+    template <typename T, typename... Args> void post(Args &&... args) {
+        post(std::make_shared<T>(std::forward<Args>(args)...));
     }
 
-    template <typename T, typename... Args> void notify(Args &&... args) {
-        notify(std::make_shared<T>(std::forward<Args>(args)...));
-    }
-
-    template <typename T> void notify(std::shared_ptr<T> data) {
+    template <typename T> void post(std::shared_ptr<T> data) {
         std::unique_lock<std::mutex> local_lock(this->_lock);
         this->_event_suject.get_subscriber().on_next(Event<T>::make(data));
         this->_cv.notify_all();
@@ -118,6 +102,7 @@ class EventBus {
     }
 
   private:
+
     rxcpp::schedulers::run_loop _rlp;
     rxcpp::observe_on_one_worker _ev_bus_worker;
 
@@ -125,7 +110,7 @@ class EventBus {
 
     std::mutex _lock;
     std::condition_variable _cv;
-
+    
     void _finish() {
         this->_event_suject.get_subscriber().on_completed();
         this->_event_suject.get_subscriber().unsubscribe();

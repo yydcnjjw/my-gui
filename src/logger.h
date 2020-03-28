@@ -49,6 +49,7 @@ class Logger {
 
     std::string _buf;
     std::mutex _lock;
+    std::condition_variable _cv;
     void _addLogOutputTarget(unsigned long offset,
                              const std::shared_ptr<LoggerOutput> &output);
 
