@@ -1,4 +1,3 @@
-// #include "aio.h"
 // #include "camera.hpp"
 // #include "canvas.h"
 // #include "draw_list.h"
@@ -206,18 +205,31 @@
 // }
 // }
 
+#include <iostream>
+#include <fstream>
+
+#include <boost/locale/encoding.hpp>
+
+#include <codecvt.h>
+#include <font_mgr.h>
 #include <storage/archive.h>
 
-#include <iostream>
+namespace conv = boost::locale::conv;
 int main(int, char *[]) {
     try {
         auto xp3_archive = my::Archive::make_xp3("../assets/models/data.xp3");
-        auto iss = xp3_archive->open("startup.tjs");
-        std::cout << iss->read_all() << std::endl;
+        auto iss = xp3_archive->open("system/initialize.tjs");
+        auto s = iss->read_all();
+        std::ofstream ofs("initialize.tjs");
+        ofs << s;
     } catch (std::exception &e) {
         std::cout << e.what() << std::endl;
     }
 
+    auto font_mgr = my::FontMgr::create();
+
+    auto font = font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
+    font->get_tex_as_alpha();
     // auto app = my::new_application(argc, argv);
     // app->run();
     // run();

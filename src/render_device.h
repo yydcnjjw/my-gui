@@ -216,8 +216,6 @@ class RenderDevice {
                             const std::function<void(void *map)>&) = 0;
 
     virtual void wait_idle() = 0;
-    virtual void with_draw(const vk::RenderPass &,
-                           const VulkanDrawCallback &) = 0;
 
     virtual void draw(uint32_t index_count, uint32_t instance_count = 1,
                       uint32_t first_index = 0, int32_t vertex_offset = 0,

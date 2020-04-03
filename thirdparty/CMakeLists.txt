@@ -28,3 +28,13 @@ execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
 execute_process(COMMAND ${CMAKE_COMMAND} --build .
   WORKING_DIRECTORY ${DEPS_DIR}/glm)
 set(glm_DIR ${DEPS_DIR}/glm/glm-src/cmake/glm CACHE INTERNAL "")
+
+# msdfgen
+configure_file(CMakeLists.txt.msdfgen.in
+               msdfgen/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY ${DEPS_DIR}/msdfgen)
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+  WORKING_DIRECTORY ${DEPS_DIR}/msdfgen)
+set(msdfgen_lib ${DEPS_DIR}/msdfgen/msdfgen-build/libmsdfgen.a CACHE INTERNAL "")
+set(msdfgen_inc ${DEPS_DIR}/msdfgen/msdfgen-src CACHE INTERNAL "")

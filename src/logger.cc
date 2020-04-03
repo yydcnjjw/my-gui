@@ -21,11 +21,6 @@ class StdLoggerOutput : public Logger::LoggerOutput {
 };
 } // namespace
 
-Logger *_get_g_logger() {
-    static Logger logger;
-    return &logger;
-}
-
 const Logger::bitmap Logger::logger_all_target = bitmap().set();
 
 Logger::Logger() : _buf(4096, 0) {
@@ -57,17 +52,6 @@ Logger::Logger() : _buf(4096, 0) {
 
     // init output target
     this->addLogOutputTarget(std::make_shared<StdLoggerOutput>(Logger::DEBUG));
-}
-
-Logger::~Logger() {
-    std::unique_lock<std::mutex> local_lock(this->_lock);
-    this->_log_source.get_subscriber().on_completed();
-    this->_log_source.get_subscriber().unsubscribe();
-    this->_cv.notify_all();
-    local_lock.unlock();
-    if (this->_log_thread.joinable()) {
-        this->_log_thread.join();
-    }
 }
 
 void Logger::Log(Logger::bitmap bit, Logger::Level type, const char *file_name,
@@ -111,6 +95,17 @@ void Logger::_addLogOutputTarget(unsigned long offset,
             [output](const std::shared_ptr<LogMsg> &msg) { (*output)(*msg); });
 
     // _output_targets[bit] = s;
+}
+
+void Logger::close() {
+    std::unique_lock<std::mutex> local_lock(this->_lock);
+    this->_log_source.get_subscriber().on_completed();
+    this->_log_source.get_subscriber().unsubscribe();
+    this->_cv.notify_all();
+    local_lock.unlock();
+    if (this->_log_thread.joinable()) {
+        this->_log_thread.join();
+    }
 }
 
 std::string Logger::LogMsg::format() const {

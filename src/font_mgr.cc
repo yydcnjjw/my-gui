@@ -1,14 +1,34 @@
 #include "font_mgr.h"
 
-#include "logger.h"
+#include <logger.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #define STB_RECT_PACK_IMPLEMENTATION
-#include "stb_rect_pack.h"
 #include <glm/glm.hpp>
+#include <msdfgen.h>
+#include <stb_rect_pack.h>
+
+#define FT_CEIL(X) (((X + 63) & -64) / 64)
 
 namespace {
+struct GlyphData {
+    wchar_t charcode;
+    uint32_t w;
+    uint32_t h;
+    int offset_x;
+    int offset_y;
+    float advance_x;
+    uint32_t x;
+    u_char *pixels;
+    uint32_t y;
+
+    GlyphData(const FT_GlyphSlot &slot, wchar_t charcode)
+        : charcode(charcode), w(slot->bitmap.width), h(slot->bitmap.rows),
+          offset_x(slot->bitmap_left), offset_y(slot->bitmap_top),
+          advance_x(FT_CEIL(slot->advance.x)) {}
+};
+
 
 void blit_glyph(const FT_Bitmap *ft_bitmap, uint8_t *dst, uint32_t dst_pitch) {
     assert(dst);
@@ -51,13 +71,13 @@ class MyFont : public my::Font {
         }
 
         FT_Set_Pixel_Sizes(this->_ft_face, 0, this->_default_font_size);
-
     }
     ~MyFont() { FT_Done_Face(this->_ft_face); }
 
     uint32_t get_default_font_size() const override {
         return this->_default_font_size;
     };
+
     u_char *get_tex_as_alpha(int *out_w, int *out_h) override {
         if (this->_alpha_tex) {
             *out_w = this->_tex_w;
@@ -65,73 +85,88 @@ class MyFont : public my::Font {
             return this->_alpha_tex;
         }
         const size_t BITMAP_BUF_CHUNK_SIZE = 256 * 1024;
-        std::vector<u_char *> bitmap_buf{new u_char[BITMAP_BUF_CHUNK_SIZE]};
+        std::vector<std::shared_ptr<u_char[]>> bitmap_buf{
+            std::shared_ptr<u_char[]>(new u_char[BITMAP_BUF_CHUNK_SIZE])};
         size_t bitmap_buf_used = 0;
-#define FT_CEIL(X) (((X + 63) & -64) / 64)
-        struct GlyphData {
-            wchar_t charcode;
-            uint32_t w;
-            uint32_t h;
-            int offset_x;
-            int offset_y;
-            float advance_x;
-            uint32_t x;
-            u_char *pixels;
-            uint32_t y;
-
-            GlyphData(const FT_GlyphSlot &slot, wchar_t charcode)
-                : charcode(charcode), w(slot->bitmap.width),
-                  h(slot->bitmap.rows), offset_x(slot->bitmap_left),
-                  offset_y(slot->bitmap_top),
-                  advance_x(FT_CEIL(slot->advance.x)) {}
-        };
 
         std::vector<GlyphData> glyphs;
 
-        for (const auto &range : this->get_glyph_ranges_default()) {
-            for (wchar_t ch = range.first; ch <= range.second; ++ch) {
-                uint32_t index = FT_Get_Char_Index(_ft_face, ch);
-                if (!index) {
-                    continue;
-                }
-                auto &slot = this->_ft_face->glyph;
+        FT_UInt index;
+        auto char_code = FT_Get_First_Char(this->_ft_face, &index);
+        while (index != 0) {
+            auto &slot = this->_ft_face->glyph;
 
-                FT_Error e =
-                    FT_Load_Glyph(this->_ft_face, index, FT_LOAD_DEFAULT);
-                if (e) {
-                    throw std::runtime_error(FT_Error_String(e));
-                }
-
-                e = FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL);
-                if (e) {
-                    throw std::runtime_error(FT_Error_String(e));
-                }
-
-                GlyphData data(slot, ch);
-
-                size_t alloc_size = data.w * data.h;
-                if (alloc_size + bitmap_buf_used > BITMAP_BUF_CHUNK_SIZE) {
-                    bitmap_buf.push_back(new u_char[BITMAP_BUF_CHUNK_SIZE]);
-                }
-                data.pixels = bitmap_buf.back() + bitmap_buf_used;
-                bitmap_buf_used += alloc_size;
-
-                blit_glyph(&slot->bitmap, data.pixels, data.w);
-                glyphs.push_back(data);
+            FT_Error e = FT_Load_Glyph(this->_ft_face, index, FT_LOAD_DEFAULT);
+            if (e) {
+                throw std::runtime_error(FT_Error_String(e));
             }
+
+            e = FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL);
+            if (e) {
+                throw std::runtime_error(FT_Error_String(e));
+            }
+            GlyphData data(slot, char_code);
+
+            size_t alloc_size = data.w * data.h;
+            if (alloc_size + bitmap_buf_used > BITMAP_BUF_CHUNK_SIZE) {
+                bitmap_buf.push_back(std::shared_ptr<u_char[]>(
+                    new u_char[BITMAP_BUF_CHUNK_SIZE]));
+                bitmap_buf_used = 0;
+            }
+
+            data.pixels = bitmap_buf.back().get() + bitmap_buf_used;
+            bitmap_buf_used += alloc_size;
+
+            blit_glyph(&slot->bitmap, data.pixels, data.w);
+            glyphs.push_back(data);
+
+            char_code = FT_Get_Next_Char(this->_ft_face, char_code, &index);
         }
 
+        // for (const auto &range : this->get_glyph_ranges_default()) {
+        //     for (wchar_t ch = range.first; ch <= range.second; ++ch) {
+        //         uint32_t index = FT_Get_Char_Index(this->_ft_face, ch);
+        //         if (!index) {
+        //             continue;
+        //         }
+        //         auto &slot = this->_ft_face->glyph;
+
+        //         FT_Error e =
+        //             FT_Load_Glyph(this->_ft_face, index, FT_LOAD_DEFAULT);
+        //         if (e) {
+        //             throw std::runtime_error(FT_Error_String(e));
+        //         }
+
+        //         e = FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL);
+        //         if (e) {
+        //             throw std::runtime_error(FT_Error_String(e));
+        //         }
+
+        //         GlyphData data(slot, ch);
+
+        //         size_t alloc_size = data.w * data.h;
+        //         if (alloc_size + bitmap_buf_used > BITMAP_BUF_CHUNK_SIZE) {
+        //             bitmap_buf.push_back(std::shared_ptr<u_char[]>(
+        //                 new u_char[BITMAP_BUF_CHUNK_SIZE]));
+        //         }
+        //         data.pixels = bitmap_buf.back().get() + bitmap_buf_used;
+        //         bitmap_buf_used += alloc_size;
+
+        //         blit_glyph(&slot->bitmap, data.pixels, data.w);
+        //         glyphs.push_back(data);
+        //     }
+        // }
+
         const size_t TEX_HEIGHT_MAX = 1024 * 32;
-        const size_t TEX_WIDTH = 512;
-        const size_t TEX_GLYPH_PADDING = 1;
+        const size_t TEX_WIDTH = 1024;
         stbrp_context pack_ctx;
-        std::vector<stbrp_node> pack_nodes(TEX_WIDTH + TEX_GLYPH_PADDING);
+        std::vector<stbrp_node> pack_nodes(TEX_WIDTH);
 
         ::stbrp_init_target(&pack_ctx, TEX_WIDTH, TEX_HEIGHT_MAX,
                             pack_nodes.data(), pack_nodes.size());
 
         std::vector<stbrp_rect> rects(glyphs.size());
-        for (auto i = 0; i < glyphs.size(); i++) {
+        for (size_t i = 0; i < glyphs.size(); i++) {
             rects[i].w = glyphs[i].w;
             rects[i].h = glyphs[i].h;
         }
@@ -139,7 +174,7 @@ class MyFont : public my::Font {
         ::stbrp_pack_rects(&pack_ctx, rects.data(), rects.size());
 
         int tex_h = 0;
-        for (auto i = 0; i < rects.size(); i++) {
+        for (size_t i = 0; i < rects.size(); i++) {
             if (!rects[i].was_packed) {
                 continue;
             }
@@ -152,18 +187,15 @@ class MyFont : public my::Font {
         this->_tex_h = tex_h;
         this->_alpha_tex = new u_char[this->_tex_h * this->_tex_w];
         ::bzero(this->_alpha_tex, this->_tex_h * this->_tex_w);
+        GLOG_D("char number %d font texture w = %d h = %d", glyphs.size(),
+               this->_tex_w, this->_tex_h);
 
-        for (auto i = 0; i < glyphs.size(); i++) {
+        for (size_t i = 0; i < glyphs.size(); i++) {
             if (!rects[i].was_packed) {
                 GLOG_W("%#x was not packed", glyphs[i].charcode);
                 continue;
             }
             auto &data = glyphs[i];
-            // assert(data.w + TEX_GLYPH_PADDING <= rects[i].w);
-            // assert(data.h + TEX_GLYPH_PADDING <= rects[i].h);
-
-            // const int tx = data.x + TEX_GLYPH_PADDING;
-            // const int ty = data.y + TEX_GLYPH_PADDING;
 
             auto blit_src_stride = data.w;
             auto blit_dst_stride = this->_tex_w;
@@ -174,7 +206,6 @@ class MyFont : public my::Font {
                 memcpy(blit_dst, blit_src, blit_src_stride);
             }
 
-            // TODO:
             float u0 = data.x / (float)this->_tex_w;
             float v0 = data.y / (float)this->_tex_h;
             float u1 = (data.x + data.w) / (float)this->_tex_w;
@@ -262,8 +293,7 @@ class MyFontMgr : public my::FontMgr {
 };
 } // namespace
 namespace my {
-FontMgr *get_font_mgr() {
-    static auto mgr = MyFontMgr();
-    return &mgr;
+std::unique_ptr<FontMgr> FontMgr::create() {
+    return std::make_unique<MyFontMgr>();
 }
 } // namespace my

@@ -14,17 +14,70 @@ namespace {
 
 class SDLWindow : public my::Window {
   public:
-    SDLWindow(SDL_Window *win) : _sdl_window(win) {}
+    SDLWindow(SDL_Window *win)
+        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)) {}
 
     ~SDLWindow() { SDL_DestroyWindow(this->_sdl_window); }
 
-    std::pair<uint32_t, uint32_t> get_frame_buffer_size() override {
+    my::Size2D get_frame_buffer_size() override {
         // TODO: gl vulkan
         int w, h;
         SDL_Vulkan_GetDrawableSize(this->_sdl_window, &w, &h);
-        return {w, h};
+        return my::Size2D(w, h);
     }
 
+    void set_frame_buffer_size(const my::Size2D &size) override {
+        this->set_size(size);
+    }
+
+    my::Size2D get_min_size() override {
+        int w, h;
+        SDL_GetWindowMinimumSize(this->_sdl_window, &w, &h);
+        return my::Size2D(w, h);
+    }
+    my::Size2D get_max_size() override {
+        int w, h;
+        SDL_GetWindowMaximumSize(this->_sdl_window, &w, &h);
+        return my::Size2D(w, h);
+    }
+
+    void set_min_size(const my::Size2D &size) override {
+        SDL_SetWindowMinimumSize(this->_sdl_window, size.w, size.h);
+    }
+    void set_max_size(const my::Size2D &size) override {
+        SDL_SetWindowMaximumSize(this->_sdl_window, size.w, size.h);
+    }
+
+    my::Size2D get_size() override {
+        int w, h;
+        SDL_GetWindowSize(this->_sdl_window, &w, &h);
+        return my::Size2D(w, h);
+    }
+
+    void set_size(const my::Size2D &size) override {
+        SDL_SetWindowSize(this->_sdl_window, size.w, size.h);
+    }
+    my::PixelPos get_pos() override {
+        int x, y;
+        SDL_GetWindowPosition(this->_sdl_window, &x, &y);
+        return {x, y};
+    }
+    void set_pos(const my::PixelPos &pos) override {
+        SDL_SetWindowPosition(this->_sdl_window, pos.x, pos.y);
+    }
+
+    virtual void set_full_screen(bool full_screen) override {
+        SDL_SetWindowFullscreen(this->_sdl_window,
+                                full_screen ? SDL_WINDOW_FULLSCREEN : 0);
+    }
+
+    my::WindowID get_window_id() override { return this->_win_id; }
+
+    void hide() override { SDL_HideWindow(this->_sdl_window); };
+    void show() override { SDL_ShowWindow(this->_sdl_window); }
+    void show_cursor(bool toggle) override {
+        SDL_ShowCursor(toggle ? SDL_ENABLE : SDL_DISABLE);
+    }
     [[nodiscard]] virtual std::vector<const char *>
     get_require_surface_extension() const override {
         unsigned int count = 0;
@@ -54,6 +107,7 @@ class SDLWindow : public my::Window {
 
   private:
     SDL_Window *_sdl_window;
+    my::WindowID _win_id;
 };
 
 class SDLWindowMgr : public my::WindowMgr {
@@ -64,30 +118,53 @@ class SDLWindowMgr : public my::WindowMgr {
             throw std::runtime_error(SDL_GetError());
         }
 
-        this->_win_mgr_thread = std::thread([bus]() {
+        this->_init_desktop_display_mode();
+        bus->on_event<my::QuitEvent>()
+            .observe_on(bus->ev_bus_worker())
+            .subscribe([this](const auto &) { this->_is_exit = true; });
+        this->_win_mgr_thread = std::thread([this, bus]() {
             pthread_setname_np(pthread_self(), "win mgr");
             GLOG_D("window loop running!");
-            bool is_exit = false;
-            while (!is_exit) {
+
+            while (!this->_is_exit) {
                 SDL_Event sdl_event{};
-                SDL_WaitEvent(&sdl_event);
+                SDL_WaitEventTimeout(&sdl_event, 200);
 
                 switch (sdl_event.type) {
                 case SDL_QUIT:
                     bus->post<my::QuitEvent>();
-                    is_exit = true;
+                    this->_is_exit = true;
                     break;
                 case SDL_MOUSEMOTION:
                     bus->post<my::MouseMotionEvent>(
+                        sdl_event.motion.windowID,
                         my::PixelPos{sdl_event.motion.x, sdl_event.motion.y},
                         sdl_event.motion.xrel, sdl_event.motion.yrel,
                         sdl_event.motion.state);
                     break;
+                case SDL_MOUSEWHEEL:
+                    bus->post<my::MoushWheelEvent>(
+                        sdl_event.wheel.windowID,
+                        my::PixelPos{sdl_event.wheel.x, sdl_event.wheel.y},
+                        sdl_event.wheel.which, sdl_event.wheel.direction);
+                    break;
                 case SDL_KEYUP:
                 case SDL_KEYDOWN:
-                    bus->post<my::KeyboardEvent>(sdl_event.key.state,
-                                                   sdl_event.key.repeat != 0,
-                                                   sdl_event.key.keysym);
+                    bus->post<my::KeyboardEvent>(
+                        sdl_event.window.windowID, sdl_event.key.state,
+                        sdl_event.key.repeat != 0, sdl_event.key.keysym);
+                    break;
+                case SDL_WINDOWEVENT:
+                    bus->post<my::WindowEvent>(sdl_event.window.windowID,
+                                               sdl_event.window.event);
+                    break;
+                case SDL_MOUSEBUTTONDOWN:
+                case SDL_MOUSEBUTTONUP:
+                    bus->post<my::MouseButtonEvent>(
+                        sdl_event.button.windowID, sdl_event.button.which,
+                        sdl_event.button.button, sdl_event.button.state,
+                        sdl_event.button.clicks,
+                        my::PixelPos{sdl_event.button.x, sdl_event.button.y});
                     break;
                 default:
                     break;
@@ -115,16 +192,42 @@ class SDLWindowMgr : public my::WindowMgr {
             throw std::runtime_error(SDL_GetError());
         }
         auto win = std::make_unique<SDLWindow>(sdl_win);
-        auto win_ptr = win.get();
-        windows[win_ptr] = std::move(win);
-        return win_ptr;
+        auto id = win->get_window_id();
+        this->_windows[id] = std::move(win);
+        return this->_windows.at(id).get();
     }
 
-    void remove_window(my::Window *win) override { windows.erase(win); }
+    void remove_window(my::Window *win) override {
+        this->_windows.erase(win->get_window_id());
+    }
+
+    const my::DisplayMode &get_desktop_display_mode() override {
+        return this->_desktop_display_mode;
+    }
+
+    my::Keymod get_key_mode() override {
+        return static_cast<my::Keymod>(SDL_GetModState());
+    }
+
+    my::MouseState get_mouse_state() override {
+        int x, y;
+        auto mask = SDL_GetMouseState(&x, &y);
+        return my::MouseState(mask, {x, y});
+    }
 
   private:
-    std::map<my::Window *, std::unique_ptr<SDLWindow>> windows;
+    std::map<my::WindowID, std::unique_ptr<SDLWindow>> _windows;
     std::thread _win_mgr_thread;
+    my::DisplayMode _desktop_display_mode;
+    bool _is_exit = false;
+    void _init_desktop_display_mode() {
+        SDL_DisplayMode mode;
+        if (SDL_GetDesktopDisplayMode(0, &mode) != 0) {
+            throw std::runtime_error(SDL_GetError());
+        }
+        this->_desktop_display_mode = {mode.format, mode.w, mode.h,
+                                       mode.refresh_rate};
+    }
 };
 
 } // namespace
@@ -134,53 +237,3 @@ std::unique_ptr<WindowMgr> WindowMgr::create(EventBus *bus) {
     return std::make_unique<SDLWindowMgr>(bus);
 }
 } // namespace my
-
-// class GlfwWindow : public my::VulkanPlatformSurface {
-//   public:
-//     GlfwWindow() {
-//         ::glfwInit();
-//         ::glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-//         this->_glfw_window =
-//             ::glfwCreateWindow(800, 600, "Test", nullptr, nullptr);
-//     }
-
-//     ~GlfwWindow() {
-//         ::glfwDestroyWindow(this->_glfw_window);
-//         ::glfwTerminate();
-//     }
-
-//     bool is_should_close() {
-//         return ::glfwWindowShouldClose(this->_glfw_window);
-//     }
-
-//     std::pair<uint32_t, uint32_t> get_frame_buffer_size() {
-//         int w, h;
-//         ::glfwGetFramebufferSize(this->_glfw_window, &w, &h);
-//         return {w, h};
-//     }
-
-//     void swap_buffers() { ::glfwSwapBuffers(this->_glfw_window); }
-
-//     void poll_events() { ::glfwPollEvents(); }
-
-//     [[nodiscard]] std::vector<const char *>
-//     get_require_surface_extension() const override {
-//         uint32_t count = 0;
-//         auto extensions = ::glfwGetRequiredInstanceExtensions(&count);
-//         return std::vector(extensions, extensions + count);
-//     }
-
-//     [[nodiscard]] vk::SurfaceKHR
-//     get_surface(vk::Instance instance) const override {
-//         VkSurfaceKHR s;
-//         if (::glfwCreateWindowSurface(instance, this->_glfw_window, nullptr,
-//                                       &s) != VK_SUCCESS) {
-//             throw std::runtime_error("failed to create window surface");
-//         }
-//         return vk::SurfaceKHR(s);
-//     }
-
-//   private:
-//     GLFWwindow *_glfw_window;
-// };

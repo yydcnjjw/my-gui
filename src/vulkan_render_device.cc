@@ -82,11 +82,8 @@ class VulkanRenderDevice : public my::RenderDevice {
         this->_vk_ctx->sumit_command_buffer(cb);
     }
 
-    void with_draw(const vk::RenderPass &render_pass,
-                   const my::VulkanDrawCallback &draw_func) override {}
-
     void bind_pipeline(my::VulkanPipeline *pipeline) override {
-        auto &current_buffer_index = this->_vk_ctx->get_current_buffer_index();
+        // auto &current_buffer_index = this->_vk_ctx->get_current_buffer_index();
         auto &cb = this->_primary_cmd_buffer.get();
         cb.bindPipeline(vk::PipelineBindPoint::eGraphics,
                         pipeline->handle.get());

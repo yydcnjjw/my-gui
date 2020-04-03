@@ -36,15 +36,21 @@ class Logger {
         Logger::Level limit_level;
     };
 
-    Logger();
-    ~Logger();
-
     void addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output);
 
     void Log(bitmap bitmap, Logger::Level type, const char *file_name,
              int file_len, const char *fmt, ...);
 
+    static Logger *get() {
+        static Logger instance;
+        return &instance;
+    }
+
+    void close();
+
   private:
+    Logger();
+    
     bitmap _bitmap;
 
     std::string _buf;
@@ -62,8 +68,6 @@ class Logger {
     std::thread _log_thread;
 };
 
-Logger *_get_g_logger();
-
 #define LOG_D(logger, target, fmt, args...)                                    \
     (logger)->Log(target, Logger::Level::DEBUG, __FILE__, __LINE__, fmt, ##args)
 
@@ -77,16 +81,16 @@ Logger *_get_g_logger();
     (logger)->Log(target, Logger::Level::ERROR, __FILE__, __LINE__, fmt, ##args)
 
 #define GLOG_T_D(target, fmt, args...)                                         \
-    LOG_D(_get_g_logger(), target, fmt, ##args)
+    LOG_D(Logger::get(), target, fmt, ##args)
 
 #define GLOG_T_I(target, fmt, args...)                                         \
-    LOG_I(_get_g_logger(), target, fmt, ##args)
+    LOG_I(Logger::get(), target, fmt, ##args)
 
 #define GLOG_T_W(target, fmt, args...)                                         \
-    LOG_W(_get_g_logger(), target, fmt, ##args)
+    LOG_W(Logger::get(), target, fmt, ##args)
 
 #define GLOG_T_E(target, fmt, args...)                                         \
-    LOG_E(_get_g_logger(), target, fmt, ##args)
+    LOG_E(Logger::get(), target, fmt, ##args)
 
 #define GLOG_D(fmt, args...)                                                   \
     GLOG_T_D(Logger::logger_all_target, fmt, ##args)

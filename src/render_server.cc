@@ -29,7 +29,7 @@ class MyRenderServer : public my::RenderServer {
 } // namespace
 
 namespace my {
-static std::unique_ptr<RenderServer> create(EventBus *bus, Window *win) {
+std::unique_ptr<RenderServer> RenderServer::create(EventBus *bus, Window *win) {
     return std::make_unique<MyRenderServer>(bus, win);
 }
 } // namespace my

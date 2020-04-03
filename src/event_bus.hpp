@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <rx.hpp>
 
-#include "logger.h"
+#include <logger.h>
 
 namespace my {
 class IEvent {
@@ -42,13 +42,10 @@ template <typename T> class Event : public IEvent {
 };
 
 struct QuitEvent {};
-    
+
 class EventBus {
   public:
-   EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {
-        
-    }
-    
+    EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {}
     template <typename T> auto on_event() -> decltype(auto) {
         std::unique_lock<std::mutex> local_lock(this->_lock);
         return this->_event_suject.get_observable()
@@ -84,7 +81,7 @@ class EventBus {
             }
             if (this->_event_suject.get_subscriber().is_subscribed() ||
                 !this->_rlp.empty()) {
-                GLOG_D("event loop is blocking ...");
+                // GLOG_D("event loop is blocking ...");
                 std::unique_lock<std::mutex> local_lock(this->_lock);
                 this->_cv.wait(local_lock, [this] {
                     return !this->_rlp.empty() &&
@@ -101,8 +98,9 @@ class EventBus {
         return this->_ev_bus_worker;
     }
 
-  private:
+    static std::unique_ptr<EventBus> create();
 
+  private:
     rxcpp::schedulers::run_loop _rlp;
     rxcpp::observe_on_one_worker _ev_bus_worker;
 
@@ -110,7 +108,7 @@ class EventBus {
 
     std::mutex _lock;
     std::condition_variable _cv;
-    
+
     void _finish() {
         this->_event_suject.get_subscriber().on_completed();
         this->_event_suject.get_subscriber().unsubscribe();

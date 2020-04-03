@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <stdint.h>
 #include <vector>
 
@@ -17,6 +18,8 @@ struct FontGlyph {
     glm::vec2 uv0;
     glm::vec2 uv1;
 };
+
+class FontFamily {};
 
 class Font {
   public:
@@ -39,10 +42,12 @@ class Font {
 
 class FontMgr {
   public:
-    FontMgr() = default;
     virtual ~FontMgr() = default;
     virtual Font *add_font(const char *path) = 0;
-};
 
-FontMgr *get_font_mgr();
+    static std::unique_ptr<FontMgr> create();
+
+  protected:
+    FontMgr() = default;
+};
 } // namespace my

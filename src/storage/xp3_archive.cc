@@ -1,15 +1,18 @@
 #include "archive.h"
 
+#include <cstring>
+#include <fstream>
+#include <locale>
+#include <sstream>
+
+#include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
-#include <codecvt>
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <locale>
-#include <sstream>
+
+#include <codecvt.h>
+#include <logger.h>
 
 namespace {
 
@@ -92,9 +95,10 @@ class XP3Archive : public my::Archive {
 
         XP3ArchiveIndex index;
         xp3_archive.read((char *)&index, sizeof(XP3ArchiveIndex));
-
+        uint64_t index_size = index.index_size;
         if (index.encode_method == EncodeMethod::ZLIB) {
             xp3_archive.read((char *)index.uncompress_size, sizeof(uint64_t));
+            index_size = index.uncompress_size[0];
         }
 
         boost::iostreams::filtering_istream ss_decomp;
@@ -111,43 +115,46 @@ class XP3Archive : public my::Archive {
                                        0x72 /*'r'*/};
 
         std::shared_ptr<XP3ArchiveFileInfo> file_info = nullptr;
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>
-            convert;
+        utf16_codecvt code_cvt;
 
-        while (!ss_decomp.eof()) {
-            XP3ArchiveChunk chunk;
-            ss_decomp.read((char *)&chunk, sizeof(XP3ArchiveChunk));
+        uint64_t read_size = 0;
+        auto read = [&ss_decomp, &read_size](void *data, size_t size) {
+            ss_decomp.read((char *)data, size);
+            read_size += size;
+        };
+
+        while (read_size < index_size) {
+            XP3ArchiveChunk chunk{};
+            read(&chunk, sizeof(XP3ArchiveChunk));
 
             if (!std::memcmp(chunk.type, chunk_file, 4)) {
                 assert(!file_info);
                 file_info = std::make_shared<XP3ArchiveFileInfo>();
             } else if (!std::memcmp(chunk.type, chunk_info, 4)) {
                 assert(file_info);
-                XP3ArchiveChunkInfo info;
-                ss_decomp.read((char *)&info, sizeof(XP3ArchiveChunkInfo));
+                XP3ArchiveChunkInfo info{};
+                read(&info, sizeof(XP3ArchiveChunkInfo));
 
                 file_info->org_size = info.org_size;
                 file_info->arc_size = info.arc_size;
                 file_info->flag = info.flag;
                 file_info->path.resize(info.len);
                 std::u16string s(info.len, 0);
-                ss_decomp.read((char *)s.data(), info.len * 2);
-                file_info->path = convert.to_bytes(s);
+                read(s.data(), info.len * 2);
+                file_info->path = code_cvt.to_bytes(s);
 
             } else if (!std::memcmp(chunk.type, chunk_segm, 4)) {
                 assert(file_info);
                 file_info->segms.resize(chunk.size /
                                         sizeof(XP3ArchiveChunkSegm));
-                ss_decomp.read((char *)file_info->segms.data(), chunk.size);
+                read(file_info->segms.data(), chunk.size);
             } else if (!std::memcmp(chunk.type, chunk_adlr, 4)) {
-
-                XP3ArchiveChunkAldr aldr;
-                ss_decomp.read((char *)&aldr, sizeof(XP3ArchiveChunkAldr));
-                if (file_info) {
-                    file_info->hash = aldr.hash;
-                    this->_xp3_index.insert({file_info->path, file_info});
-                    file_info.reset();
-                }
+                assert(file_info);
+                XP3ArchiveChunkAldr aldr{};
+                read(&aldr, sizeof(XP3ArchiveChunkAldr));
+                file_info->hash = aldr.hash;
+                this->_xp3_index.insert({file_info->path, file_info});
+                file_info.reset();
             } else {
                 throw std::runtime_error(
                     (boost::format("xp3 archive: unknown chunk %1") %
@@ -155,9 +162,15 @@ class XP3Archive : public my::Archive {
                         .str());
             }
         }
+        GLOG_D("read size %d, index size %d", read_size, index_size);
     }
 
     ~XP3Archive() override {}
+
+    bool exists(const my::fs::path &path) override {
+        return this->_xp3_index.find(boost::algorithm::to_lower_copy(
+                   path.string())) != this->_xp3_index.end();
+    }
 
     class XP3Stream : public my::Archive::Stream {
       public:
@@ -171,14 +184,13 @@ class XP3Archive : public my::Archive {
 
         std::string read_all() override {
             std::string buf(this->_file_info->org_size, 0);
-            std::cout << buf.size() << std::endl;
+
             size_t size = 0;
             for (auto &segm : this->_file_info->segms) {
                 this->_archive.seekg(segm.start);
-                std::cout << segm.org_size << std::endl;
+
                 boost::iostreams::filtering_istream ss_decomp;
                 ss_decomp.exceptions(std::ifstream::failbit);
-
                 ss_decomp.push(boost::iostreams::zlib_decompressor());
                 ss_decomp.push(this->_archive);
 
@@ -200,7 +212,9 @@ class XP3Archive : public my::Archive {
                 (boost::format("xp3 archive: path format error %1") % path)
                     .str());
         }
-        auto it = this->_xp3_index.find(path.string());
+
+        auto it = this->_xp3_index.find(
+            boost::algorithm::to_lower_copy(path.string()));
         if (it == this->_xp3_index.end()) {
             throw std::runtime_error(
                 (boost::format("xp3 archive: %1 is not exist") % path).str());

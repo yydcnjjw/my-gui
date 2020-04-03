@@ -1,0 +1,14 @@
+cmake_minimum_required(VERSION 2.8.2)
+
+project(msdfgen NONE)
+include(ExternalProject)
+
+ExternalProject_Add(msdfgen
+  GIT_REPOSITORY https://github.com/Chlumsky/msdfgen.git
+  GIT_TAG master
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${DEPS_DIR}
+  SOURCE_DIR ${DEPS_DIR}/msdfgen/msdfgen-src
+  BINARY_DIR ${DEPS_DIR}/msdfgen/msdfgen-build
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+  )

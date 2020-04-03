@@ -44,29 +44,29 @@ class VulkanCanvas : public my::Canvas {
     VulkanCanvas(my::VulkanCtx *ctx, my::RenderDevice *device)
         : _vk_ctx(ctx), _render_device(device) {
 
-        auto vert_shader = this->_render_device->create_shader(
-            my::aio::file_read_all("../assets/shaders/canvas_shader.vert.spv")
-                .get(),
-            vk::ShaderStageFlagBits ::eVertex, "main");
-        auto frag_shader = this->_render_device->create_shader(
-            my::aio::file_read_all("../assets/shaders/canvas_shader.frag.spv")
-                .get(),
-            vk::ShaderStageFlagBits ::eFragment, "main");
+        // auto vert_shader = this->_render_device->create_shader(
+        //     my::aio::file_read_all("../assets/shaders/canvas_shader.vert.spv")
+        //         .get(),
+        //     vk::ShaderStageFlagBits ::eVertex, "main");
+        // auto frag_shader = this->_render_device->create_shader(
+        //     my::aio::file_read_all("../assets/shaders/canvas_shader.frag.spv")
+        //         .get(),
+        //     vk::ShaderStageFlagBits ::eFragment, "main");
 
-        my::VertexDesciption vertex_desc = {
-            {VulkanCanvas::get_binding_description()},
-            VulkanCanvas::get_attribute_descriptions()};
+        // my::VertexDesciption vertex_desc = {
+        //     {VulkanCanvas::get_binding_description()},
+        //     VulkanCanvas::get_attribute_descriptions()};
 
-        vk::PushConstantRange push_constant_range(
-            vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstBlock));
+        // vk::PushConstantRange push_constant_range(
+        //     vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstBlock));
 
-        this->_pipeline = this->_render_device->create_pipeline(
-            {vert_shader, frag_shader}, vertex_desc, false,
-            {push_constant_range});
+        // this->_pipeline = this->_render_device->create_pipeline(
+        //     {vert_shader, frag_shader}, vertex_desc, false,
+        //     {push_constant_range});
 
-        my::FontMgr *font_mgr = my::get_font_mgr();
-        this->_default_font =
-            font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
+        // my::FontMgr *font_mgr = my::FontMgr::get();
+        // this->_default_font =
+        //     font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
         auto font_pixels = this->_default_font->get_tex_as_rgb32(&w, &h);
         assert(font_pixels);
         GLOG_D("w = %d h = %d", w, h);

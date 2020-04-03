@@ -1,64 +1,98 @@
 #include "application.h"
 
+#include <sstream>
+
 #include "logger.h"
 #include "window_mgr.h"
+#include "resource_mgr.h"
+#include "async_task.h"
 
 namespace {
 namespace program_options = boost::program_options;
 class PosixApplication : public my::Application {
   public:
-    PosixApplication(int argc, char *argv[])
-        : Application(argc, argv), _ev_bus(std::make_unique<my::EventBus>()),
-          _win_mgr(my::WindowMgr::create(this->_ev_bus.get())) {
+    PosixApplication(int argc, char **argv,
+                     const program_options::options_description &opts_desc)
+        : _ev_bus(my::EventBus::create()),
+          _async_task(my::AsyncTask::create()),
+          _win_mgr(my::WindowMgr::create(this->_ev_bus.get())),
+          _resource_mgr(my::ResourceMgr::create(this->_async_task.get())),
+          _font_mgr(my::FontMgr::create()) {
+        // XXX:
         pthread_setname_np(pthread_self(), "main");
-        this->_parse_program_options(argc, argv);
+        this->_parse_program_options(argc, argv, opts_desc);
     }
 
     ~PosixApplication() override {}
 
     void run() override {
         try {
-            auto win = this->_win_mgr->create_window("Test", 800, 600);
-
-            this->_ev_bus->on_event<my::MouseMotionEvent>()
-                .observe_on(this->_ev_bus->ev_bus_worker())
-                .subscribe(
-                    [](std::shared_ptr<my::Event<my::MouseMotionEvent>> e) {
-                        GLOG_D("pos x = %d y = %d", e->data->pos.x,
-                               e->data->pos.y);
-                    });
-
             this->_ev_bus->run();
+            Logger::get()->close();
         } catch (std::exception &e) {
             GLOG_E(e.what());
         }
     }
 
-    my::EventBus *get_ev_bus() const override { return this->_ev_bus.get(); }
+    void quit() override { this->_ev_bus->post<my::QuitEvent>(); }
 
-    const program_options::variable_value &
-    get_program_option_value(const std::string &option) const override {
-        return this->_program_option_map[option];
+    my::EventBus *ev_bus() const override { return this->_ev_bus.get(); }
+    my::WindowMgr *win_mgr() const override {
+        return this->_win_mgr.get();
+    };
+    my::FontMgr *font_mgr() const override {
+        return this->_font_mgr.get();
+    }
+
+    my::AsyncTask *async_task() const override {
+        return this->_async_task.get();
+    }
+
+    my::ResourceMgr *resource_mgr() const override {
+        return this->_resource_mgr.get();
+    }
+
+    program_options::option_description &get_option_desc() {
+        return this->_opts_desc;
+    }
+
+    bool
+    get_program_option(const std::string &option,
+                       program_options::variable_value &value) const override {
+        if (this->_program_option_map.count(option)) {
+            value = this->_program_option_map[option];
+            return true;
+        } else {
+            return false;
+        }
     }
 
   private:
+    program_options::option_description _opts_desc;
     program_options::variables_map _program_option_map;
     std::unique_ptr<my::EventBus> _ev_bus;
+    std::unique_ptr<my::AsyncTask> _async_task;
     std::unique_ptr<my::WindowMgr> _win_mgr;
-
-    void _parse_program_options(int argc, char *argv[]) {
-        program_options::options_description desc("options");
-        program_options::store(
-            program_options::parse_command_line(argc, argv, desc),
-            this->_program_option_map);
+    std::unique_ptr<my::ResourceMgr> _resource_mgr;
+    std::unique_ptr<my::FontMgr> _font_mgr;
+    
+    void
+    _parse_program_options(int argc, char **argv,
+                           const program_options::options_description &opts) {
+        program_options::store(program_options::command_line_parser(argc, argv)
+                                   .options(opts)
+                                   .allow_unregistered()
+                                   .run(),
+                               this->_program_option_map);
         program_options::notify(this->_program_option_map);
-        auto a = this->_program_option_map["aaa"];
     }
 };
 } // namespace
 
 namespace my {
-std::shared_ptr<Application> new_application(int argc, char *argv[]) {
-    return std::make_shared<PosixApplication>(argc, argv);
+std::shared_ptr<Application>
+new_application(int argc, char **argv,
+                const program_options::options_description &opts_desc) {
+    return std::make_shared<PosixApplication>(argc, argv, opts_desc);
 }
 } // namespace my
