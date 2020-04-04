@@ -2,10 +2,7 @@
 
 #include <sstream>
 
-#include "logger.h"
-#include "window_mgr.h"
-#include "resource_mgr.h"
-#include "async_task.h"
+#include <logger.h>
 
 namespace {
 namespace program_options = boost::program_options;

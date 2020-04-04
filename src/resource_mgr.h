@@ -4,7 +4,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-#include "async_task.h"
+#include "async_task.hpp"
 namespace my {
 
 class Resource : boost::noncopyable {
@@ -60,7 +60,7 @@ class ResourceMgr {
 
     static std::unique_ptr<ResourceMgr> create(AsyncTask *);
     ResourceMgr(AsyncTask *task) : _async_task(task) {}
-    
+
   private:
     std::unordered_map<std::string, std::shared_ptr<Resource>> _resources;
     mutable std::shared_mutex _resources_lock;

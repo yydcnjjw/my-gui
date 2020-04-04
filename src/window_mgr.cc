@@ -129,7 +129,6 @@ class SDLWindowMgr : public my::WindowMgr {
             while (!this->_is_exit) {
                 SDL_Event sdl_event{};
                 SDL_WaitEventTimeout(&sdl_event, 200);
-
                 switch (sdl_event.type) {
                 case SDL_QUIT:
                     bus->post<my::QuitEvent>();
@@ -175,10 +174,10 @@ class SDLWindowMgr : public my::WindowMgr {
     }
 
     ~SDLWindowMgr() {
-        SDL_Quit();
         if (this->_win_mgr_thread.joinable()) {
             this->_win_mgr_thread.join();
         }
+        SDL_Quit();
     }
     my::Window *create_window(const std::string &title, uint32_t w,
                               uint32_t h) override {

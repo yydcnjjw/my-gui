@@ -205,33 +205,59 @@
 // }
 // }
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #include <boost/locale/encoding.hpp>
 
-#include <codecvt.h>
-#include <font_mgr.h>
-#include <storage/archive.h>
+// #include <codecvt.h>
+// #include <font_mgr.h>
+// #include <storage/archive.h>
+#include <async_task.hpp>
 
 namespace conv = boost::locale::conv;
 int main(int, char *[]) {
-    try {
-        auto xp3_archive = my::Archive::make_xp3("../assets/models/data.xp3");
-        auto iss = xp3_archive->open("system/initialize.tjs");
-        auto s = iss->read_all();
-        std::ofstream ofs("initialize.tjs");
-        ofs << s;
-    } catch (std::exception &e) {
-        std::cout << e.what() << std::endl;
-    }
+    // try {
+    //     auto xp3_archive =
+    //     my::Archive::make_xp3("../assets/models/data.xp3"); auto iss =
+    //     xp3_archive->open("system/initialize.tjs"); auto s = iss->read_all();
+    //     std::ofstream ofs("initialize.tjs");
+    //     ofs << s;
+    // } catch (std::exception &e) {
+    //     std::cout << e.what() << std::endl;
+    // }
 
-    auto font_mgr = my::FontMgr::create();
+    // auto font_mgr = my::FontMgr::create();
 
-    auto font = font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
-    font->get_tex_as_alpha();
+    // auto font =
+    // font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
+    // font->get_tex_as_alpha();
     // auto app = my::new_application(argc, argv);
     // app->run();
     // run();
+    auto async_task = my::AsyncTask::create();
+    auto timer = async_task->create_timer_interval(
+        []() -> void {
+            std::cout
+                << std::chrono::steady_clock::now().time_since_epoch().count()
+                << std::endl;
+        },
+        std::chrono::milliseconds(1000));
+
+    sleep(2);
+
+    timer->start();
+
+    sleep(5);
+
+    timer->cancel();
+
+    sleep(2);
+
+    timer->start();
+
+    sleep(5);
+
+    timer->cancel();
     return 0;
 }

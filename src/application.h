@@ -1,19 +1,14 @@
 #pragma once
 
-#include <filesystem>
-#include <memory>
-
-#include <boost/program_options.hpp>
-
-#include <async_task.h>
+#include <my_gui.h>
+#include <async_task.hpp>
 #include <event_bus.hpp>
 #include <font_mgr.h>
 #include <resource_mgr.h>
 #include <window_mgr.h>
 
 namespace my {
-namespace fs = std::filesystem;
-namespace program_options = boost::program_options;
+
 class Application {
   public:
     Application(){};
