@@ -78,6 +78,11 @@ class SDLWindow : public my::Window {
     void show_cursor(bool toggle) override {
         SDL_ShowCursor(toggle ? SDL_ENABLE : SDL_DISABLE);
     }
+
+    void set_mouse_pos(const my::PixelPos &pos) override {
+        SDL_WarpMouseInWindow(this->_sdl_window, pos.x, pos.y);
+    }
+
     [[nodiscard]] virtual std::vector<const char *>
     get_require_surface_extension() const override {
         unsigned int count = 0;
@@ -150,7 +155,7 @@ class SDLWindowMgr : public my::WindowMgr {
                 case SDL_KEYUP:
                 case SDL_KEYDOWN:
                     bus->post<my::KeyboardEvent>(
-                        sdl_event.window.windowID, sdl_event.key.state,
+                        sdl_event.key.windowID, sdl_event.key.state,
                         sdl_event.key.repeat != 0, sdl_event.key.keysym);
                     break;
                 case SDL_WINDOWEVENT:

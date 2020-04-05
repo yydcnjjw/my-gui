@@ -237,11 +237,11 @@ int main(int, char *[]) {
     // run();
     auto async_task = my::AsyncTask::create();
     auto timer = async_task->create_timer_interval(
-        []() -> void {
+        std::function<void(void)>([]() -> void {
             std::cout
                 << std::chrono::steady_clock::now().time_since_epoch().count()
                 << std::endl;
-        },
+        }),
         std::chrono::milliseconds(1000));
 
     sleep(2);

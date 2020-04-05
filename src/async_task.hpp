@@ -78,8 +78,8 @@ class AsyncTask {
 
         static void on_timer(const boost::system::error_code &,
                              Timer<Callback> *timer) {
-            timer->_callback();
             if (!timer->_cancel) {
+                timer->_callback();
                 timer->_timer.expires_at(timer->_timer.expiry() +
                                          timer->_interval);
                 timer->_timer.async_wait(boost::bind<void>(

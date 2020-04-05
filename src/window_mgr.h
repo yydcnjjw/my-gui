@@ -76,6 +76,7 @@ class Window : public VulkanPlatformSurface {
     virtual void show() = 0;
 
     virtual void show_cursor(bool) = 0;
+    virtual void set_mouse_pos(const PixelPos&) = 0;
     virtual Size2D get_frame_buffer_size() = 0;
     virtual void set_frame_buffer_size(const Size2D &) = 0;
     virtual Size2D get_min_size() = 0;
