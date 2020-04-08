@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <my_gui.h>
 
 namespace my {
@@ -9,17 +10,13 @@ class Archive {
     Archive() = default;
     virtual ~Archive() = default;
 
-    static std::shared_ptr<Archive> make_xp3(const fs::path &);
     virtual bool exists(const fs::path &) = 0;
-    
-    class Stream {
-    public:
-        Stream() = default;
-        virtual ~Stream() = default;
-        virtual std::string read_all() = 0;
-    };
 
-    virtual std::shared_ptr<Stream> open(const fs::path &path) = 0;
+    virtual std::shared_ptr<std::istream> extract(const fs::path &path) = 0;
+
+    typedef std::function<std::shared_ptr<Archive>(const fs::path &)>
+        make_archive_func;
+    static const std::map<std::string, make_archive_func> &supported_archives();
 };
 
 } // namespace my

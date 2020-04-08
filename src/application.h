@@ -4,7 +4,7 @@
 #include <async_task.hpp>
 #include <event_bus.hpp>
 #include <font_mgr.h>
-#include <resource_mgr.h>
+#include <resource_mgr.hpp>
 #include <window_mgr.h>
 
 namespace my {

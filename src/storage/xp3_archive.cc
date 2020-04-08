@@ -3,13 +3,13 @@
 #include <cstring>
 #include <fstream>
 #include <locale>
-#include <sstream>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/stream.hpp>
 
 #include <codecvt.h>
 #include <logger.h>
@@ -77,7 +77,8 @@ static uint8_t XP3Mark2[] = {0x8b, 0x67, 0x01};
 
 class XP3Archive : public my::Archive {
   public:
-    explicit XP3Archive(const my::fs::path &path) : _archive_path(path) {
+    explicit XP3Archive(const my::fs::path &path)
+        : _archive_path(my::fs::absolute(path)) {
         std::ifstream xp3_archive;
         xp3_archive.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         xp3_archive.open(this->_archive_path, std::ios::binary);
@@ -88,7 +89,7 @@ class XP3Archive : public my::Archive {
         if (std::memcmp(header.mark1, XP3Mark1, sizeof(header.mark1)) ||
             std::memcmp(header.mark2, XP3Mark2, sizeof(header.mark2))) {
             throw std::runtime_error(
-                (boost::format("xp3 archive: %1 format error") % path).str());
+                (boost::format("xp3 archive: %1% format error") % path).str());
         }
 
         xp3_archive.seekg(header.index_ofs);
@@ -157,7 +158,7 @@ class XP3Archive : public my::Archive {
                 file_info.reset();
             } else {
                 throw std::runtime_error(
-                    (boost::format("xp3 archive: unknown chunk %1") %
+                    (boost::format("xp3 archive: unknown chunk %1%") %
                      std::string(chunk.type, 4))
                         .str());
             }
@@ -168,48 +169,77 @@ class XP3Archive : public my::Archive {
     ~XP3Archive() override {}
 
     bool exists(const my::fs::path &path) override {
-        return this->_xp3_index.find(boost::algorithm::to_lower_copy(
-                   path.string())) != this->_xp3_index.end();
+        return this->_xp3_index.find(path) != this->_xp3_index.end();
     }
 
-    class XP3Stream : public my::Archive::Stream {
+    class XP3Source : public boost::iostreams::source {
       public:
-        XP3Stream(const my::fs::path &archive_path,
+        XP3Source(const my::fs::path &archive_path,
                   const std::shared_ptr<XP3ArchiveFileInfo> &file_info)
-            : _file_info(file_info) {
-            this->_archive.exceptions(std::ifstream::failbit |
-                                      std::ifstream::badbit);
-            this->_archive.open(archive_path, std::ios::binary);
+            : _archive_path(archive_path), _file_info(file_info) {
+            this->_archive = std::make_shared<std::ifstream>();
+            this->_archive->exceptions(std::ifstream::failbit |
+                                       std::ifstream::badbit);
+            this->_archive->open(archive_path, std::ios::binary);
+
+            this->_current_segm = this->_file_info->segms.begin();
+            this->_archive->seekg(this->_current_segm->start);
+
+            this->_stream =
+                std::make_shared<boost::iostreams::filtering_istream>();
+            this->_stream->exceptions(std::ifstream::failbit);
+            this->_stream->push(boost::iostreams::zlib_decompressor());
+            this->_stream->push(*this->_archive);
         }
 
-        std::string read_all() override {
-            std::string buf(this->_file_info->org_size, 0);
-
-            size_t size = 0;
-            for (auto &segm : this->_file_info->segms) {
-                this->_archive.seekg(segm.start);
-
-                boost::iostreams::filtering_istream ss_decomp;
-                ss_decomp.exceptions(std::ifstream::failbit);
-                ss_decomp.push(boost::iostreams::zlib_decompressor());
-                ss_decomp.push(this->_archive);
-
-                ss_decomp.read(buf.data() + size, segm.org_size);
-                size += segm.org_size;
+        std::streamsize read(char *s, std::streamsize n) {
+            if (this->_current_segm == this->_file_info->segms.end()) {
+                return -1; // EOF
             }
-            return buf;
+
+            std::streamsize readed = 0;
+
+            while (true) {
+
+                if (this->_segm_readed + n >
+                    static_cast<std::streamsize>(
+                        this->_current_segm->org_size)) {
+                    auto size =
+                        this->_current_segm->org_size - this->_segm_readed;
+                    this->_stream->read(s, size);
+                    readed += size;
+                    n -= size;
+                } else {
+                    this->_segm_readed += n;
+                    readed += n;
+                    this->_stream->read(s, n);
+                    break;
+                }
+
+                this->_segm_readed = 0;
+                ++this->_current_segm;
+                if (this->_current_segm != this->_file_info->segms.end()) {
+                    this->_archive->seekg(this->_current_segm->start);
+                } else {
+                    break;
+                }
+            }
+            return readed;
         }
 
       private:
-        std::ifstream _archive;
+        my::fs::path _archive_path;
+        std::shared_ptr<std::ifstream> _archive;
         std::shared_ptr<XP3ArchiveFileInfo> _file_info;
+        std::vector<XP3ArchiveChunkSegm>::iterator _current_segm;
+        std::streamsize _segm_readed{0};
+        std::shared_ptr<boost::iostreams::filtering_istream> _stream;
     };
 
-    std::shared_ptr<my::Archive::Stream>
-    open(const my::fs::path &path) override {
+    std::shared_ptr<std::istream> extract(const my::fs::path &path) override {
         if (!path.is_relative()) {
             throw std::runtime_error(
-                (boost::format("xp3 archive: path format error %1") % path)
+                (boost::format("xp3 archive: path format error %1%") % path)
                     .str());
         }
 
@@ -217,10 +247,11 @@ class XP3Archive : public my::Archive {
             boost::algorithm::to_lower_copy(path.string()));
         if (it == this->_xp3_index.end()) {
             throw std::runtime_error(
-                (boost::format("xp3 archive: %1 is not exist") % path).str());
+                (boost::format("xp3 archive: %1% is not exist") % path).str());
         }
 
-        return std::make_shared<XP3Stream>(this->_archive_path, it->second);
+        return std::make_shared<boost::iostreams::stream<XP3Source>>(
+            this->_archive_path, it->second);
     }
 
   private:
@@ -232,7 +263,7 @@ class XP3Archive : public my::Archive {
 } // namespace
 
 namespace my {
-std::shared_ptr<Archive> Archive::make_xp3(const fs::path &path) {
+std::shared_ptr<Archive> open_xp3(const fs::path &path) {
     return std::make_shared<XP3Archive>(path);
 }
 } // namespace my

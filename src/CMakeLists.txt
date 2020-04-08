@@ -1,15 +1,14 @@
-set(COMPILE_FLAGS "-Wall -Wextra -ggdb3 -Fsanitize=Address")
+set(COMPILE_FLAGS "-Wall -Wextra")
 
 set(CMAKE_C_FLAGS ${COMPILE_FLAGS})
 set(CMAKE_CXX_FLAGS ${COMPILE_FLAGS})
 
-message("${msdfgen_inc}")
-message("${msdfgen_lib}")
-include_directories(
-  vulkan
-  ${msdfgen_inc})
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(my-gui_SRC
+set(my-gui_inc
+        vulkan
+        ${msdfgen_inc}
+        ${vinniefalco.url_inc})
+set(my-gui_src
   main.cc
   application.cc
   logger.cc
@@ -23,6 +22,7 @@ set(my-gui_SRC
   # vulkan_render_device.cc
   vulkan_ctx.cc
   vulkan_canvas.cc
+  storage/archive.cc
   storage/xp3_archive.cc
   # vulkan/window.cpp
   )
@@ -37,6 +37,8 @@ find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glm CONFIG)
 find_package(ZLIB REQUIRED)
+find_package(PNG REQUIRED)
+find_package(JPEG REQUIRED)
 
 set(DEPS
   Threads::Threads
@@ -45,7 +47,6 @@ set(DEPS
   glm::glm
   rxcpp
   SDL2::SDL2
-  # Boost::headers
   Boost::thread
   Boost::program_options
   Boost::iostreams
@@ -54,17 +55,21 @@ set(DEPS
   Freetype::Freetype
   ${msdfgen_lib}
   Vulkan::Vulkan
+  PNG::PNG
+  JPEG::JPEG
   # ZLIB::ZLIB
   )
 
-add_executable(my-gui ${my-gui_SRC})
+add_executable(my-gui ${my-gui_src})
 target_link_libraries(my-gui
   ${DEPS}
   )
-add_library(my-gui_lib SHARED ${my-gui_SRC})
+target_include_directories(my-gui PUBLIC ${my-gui_inc})
+add_library(my-gui_lib SHARED ${my-gui_src})
 target_link_libraries(my-gui_lib
   ${DEPS}
   )
+target_include_directories(my-gui_lib PUBLIC ${my-gui_inc})
 
 set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
 set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)

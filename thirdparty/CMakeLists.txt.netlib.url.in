@@ -1,0 +1,14 @@
+cmake_minimum_required(VERSION 2.8.2)
+
+project(netlib.url NONE)
+include(ExternalProject)
+
+ExternalProject_Add(vinniefalco.url
+  GIT_REPOSITORY https://github.com/cpp-netlib/url.git
+  GIT_TAG master
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${DEPS_DIR}
+  SOURCE_DIR ${DEPS_DIR}/netlib.url/netlib.url-src
+  BINARY_DIR ${DEPS_DIR}/netlib.url/netlib.url-build
+  # INSTALL_COMMAND ""
+  TEST_COMMAND ""
+  )

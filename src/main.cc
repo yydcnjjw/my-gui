@@ -4,7 +4,6 @@
 // #include "font_mgr.h"
 // #include "logger.h"
 // #include "render_device.h"
-// #include "resource_mgr.h"
 // #include "util.hpp"
 // #include "vulkan_ctx.h"
 // #include "window_mgr.h"
@@ -212,11 +211,50 @@
 
 // #include <codecvt.h>
 // #include <font_mgr.h>
+// #include <async_task.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <fstream>
+#include <logger.h>
+#include <sstream>
 // #include <storage/archive.h>
-#include <async_task.hpp>
+#include <resource_mgr.hpp>
+
+#include <boost/gil.hpp>
+#include <boost/gil/extension/io/png.hpp>
+#include <boost/gil/io/read_image.hpp>
 
 namespace conv = boost::locale::conv;
+
 int main(int, char *[]) {
+
+    auto async_task = my::AsyncTask::create();
+    auto resource_mgr = my::ResourceMgr::create(async_task.get());
+
+    auto script =
+        resource_mgr
+            ->load_from_uri<my::TJS2Script>(my::uri(
+                "file:///home/yydcnjjw/workspace/code/project/my-gui/debug/"
+                "deploy/assets/models/data.xp3?path=system/initialize.tjs"))
+            .get();
+
+    auto img1 =
+        resource_mgr
+            ->load_from_uri<my::Texture>(my::uri(
+                "file:///home/yydcnjjw/workspace/code/project/my-gui/debug/"
+                "deploy/assets/models/data.xp3?path=image/title.png"))
+            .get();
+
+    // auto img2 =
+    //     resource_mgr
+    //         ->load_from_path<my::Texture>("../assets/textures/chalet.jpg")
+    //         .get();
+
+    img1->raw_data();
+
+
+    // GLOG_D(s.str().c_str());
+
+    Logger::get()->close();
     // try {
     //     auto xp3_archive =
     //     my::Archive::make_xp3("../assets/models/data.xp3"); auto iss =
@@ -235,29 +273,5 @@ int main(int, char *[]) {
     // auto app = my::new_application(argc, argv);
     // app->run();
     // run();
-    auto async_task = my::AsyncTask::create();
-    auto timer = async_task->create_timer_interval(
-        std::function<void(void)>([]() -> void {
-            std::cout
-                << std::chrono::steady_clock::now().time_since_epoch().count()
-                << std::endl;
-        }),
-        std::chrono::milliseconds(1000));
-
-    sleep(2);
-
-    timer->start();
-
-    sleep(5);
-
-    timer->cancel();
-
-    sleep(2);
-
-    timer->start();
-
-    sleep(5);
-
-    timer->cancel();
     return 0;
 }
