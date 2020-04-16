@@ -1,7 +1,5 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-#include <glm/glm.hpp>
 #include <rx.hpp>
 
 namespace my {

@@ -8,8 +8,8 @@
 #include <boost/noncopyable.hpp>
 #include <boost/url/url.hpp>
 
-#include <async_task.hpp>
 #include <my_gui.h>
+#include <util/async_task.hpp>
 #include <storage/archive.h>
 
 namespace my {
@@ -28,16 +28,23 @@ class Blob : public Resource {
   public:
     explicit Blob(const fs::path &path);
     Blob(const fs::path &path, std::shared_ptr<std::istream> is);
-    std::string blob;
+
+    u_char *data() {
+        return reinterpret_cast<u_char*>(this->_blob.data());
+    }
+    size_t size() {
+        return this->_blob.size();
+    }
 
   private:
     void _load_from_stream(std::shared_ptr<std::istream> is);
+    std::string _blob;
 };
 
-class Texture : public Resource {
+class Image : public Resource {
   public:
-    explicit Texture(const fs::path &path);
-    Texture(const fs::path &path, std::shared_ptr<std::istream> is);
+    explicit Image(const fs::path &path);
+    Image(const fs::path &path, std::shared_ptr<std::istream> is);
 
     [[nodiscard]] size_t width() const { return this->_image.width(); }
     [[nodiscard]] size_t height() const { return this->_image.height(); }

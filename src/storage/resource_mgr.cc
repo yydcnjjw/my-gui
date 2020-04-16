@@ -9,7 +9,7 @@
 #include <boost/gil/io/read_image.hpp>
 #include <boost/iostreams/copy.hpp>
 
-#include <codecvt.h>
+#include <util/codecvt.h>
 
 namespace my {
 std::shared_ptr<std::ifstream> make_ifstream(const fs::path &path) {
@@ -25,16 +25,16 @@ std::shared_ptr<std::ofstream> make_ofstream(const fs::path &path) {
     return ofs;
 }
     
-Texture::Texture(const fs::path &path) : Resource(path) {
+Image::Image(const fs::path &path) : Resource(path) {
     this->_load_from_stream(path, make_ifstream(path));
 }
 
-Texture::Texture(const fs::path &path, std::shared_ptr<std::istream> is)
+Image::Image(const fs::path &path, std::shared_ptr<std::istream> is)
     : Resource(path) {
     this->_load_from_stream(path, is);
 }
 
-void Texture::_load_from_stream(const fs::path &path,
+void Image::_load_from_stream(const fs::path &path,
                                 std::shared_ptr<std::istream> is) {
     // XXX: clear failbit
     is->exceptions(std::ifstream::badbit);
@@ -68,7 +68,7 @@ Blob::Blob(const fs::path &path, std::shared_ptr<std::istream> is)
 void Blob::_load_from_stream(std::shared_ptr<std::istream> is) {
     std::stringstream ss;
     boost::iostreams::copy(*is, ss);
-    this->blob = ss.str();
+    this->_blob = ss.str();
 }
 
 TJS2Script::TJS2Script(const fs::path &path) : Resource(path) {

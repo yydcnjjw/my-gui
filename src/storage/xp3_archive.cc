@@ -11,8 +11,8 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/stream.hpp>
 
-#include <codecvt.h>
-#include <logger.h>
+#include <util/codecvt.h>
+#include <util/logger.h>
 
 namespace {
 

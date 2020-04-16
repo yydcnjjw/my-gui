@@ -54,6 +54,20 @@ execute_process(COMMAND ${CMAKE_COMMAND} --build .
   WORKING_DIRECTORY ${DEPS_DIR}/vinniefalco-url)
 set(vinniefalco.url_inc ${DEPS_DIR}/vinniefalco-url/vinniefalco-url-src/include CACHE INTERNAL "")
 
+# LLGL
+configure_file(CMakeLists.txt.LLGL.in
+               LLGL/CMakeLists.txt)
+execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+  WORKING_DIRECTORY ${DEPS_DIR}/LLGL)
+execute_process(COMMAND ${CMAKE_COMMAND} --build .
+  WORKING_DIRECTORY ${DEPS_DIR}/LLGL)
+file(GLOB LLGL_lib ${DEPS_DIR}/LLGL/LLGL-build/build/*)
+set(LLGL_inc ${DEPS_DIR}/LLGL/LLGL-src/include CACHE INTERNAL "")
+set(LLGL_lib ${LLGL_lib} CACHE INTERNAL "")
+
+
+# list(APPEND CMAKE_MODULE_PATH ${DEPS_DIR}/LLGL/LLGL-src/cmake)
+# set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} CACHE INTERNAL "" FORCE)
 # netlib.url
 # configure_file(CMakeLists.txt.netlib.url.in
 #                netlib.url/CMakeLists.txt)

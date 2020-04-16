@@ -7,43 +7,38 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(my-gui_inc
         vulkan
         ${msdfgen_inc}
-        ${vinniefalco.url_inc})
+        ${vinniefalco.url_inc}
+        ${LLGL_inc})
+
 set(my-gui_src
   main.cc
   application.cc
-  logger.cc
-  window_mgr.cc
-  render_server.cc
-  font_mgr.cc
-  resource_mgr.cc
-  draw_list.cc
-  async_task.cc
-  event_bus.cc
-  # vulkan_render_device.cc
-  vulkan_ctx.cc
-  vulkan_canvas.cc
+  util/async_task.cc
+  util/event_bus.cc
+  util/logger.cc
+  storage/resource_mgr.cc  
   storage/archive.cc
   storage/xp3_archive.cc
-  # vulkan/window.cpp
+  storage/font_mgr.cc
+  render/window/window_mgr.cc
+  render/canvas.cc
   )
 
 find_package(Threads REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
-# find_package(glfw3 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS thread program_options iostreams locale)
+find_package(Boost REQUIRED COMPONENTS thread program_options iostreams locale timer)
 find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
-find_package(glm CONFIG)
-find_package(ZLIB REQUIRED)
+find_package(glm CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
+find_package(X11 REQUIRED)
 
 set(DEPS
   Threads::Threads
   ${CMAKE_DL_LIBS}
-  # glfw
   glm::glm
   rxcpp
   SDL2::SDL2
@@ -51,13 +46,15 @@ set(DEPS
   Boost::program_options
   Boost::iostreams
   Boost::locale
+  Boost::timer  
   ${FFMPEG_LIBRARIES}
   Freetype::Freetype
   ${msdfgen_lib}
   Vulkan::Vulkan
   PNG::PNG
   JPEG::JPEG
-  # ZLIB::ZLIB
+  ${LLGL_lib}
+  X11::Xutil
   )
 
 add_executable(my-gui ${my-gui_src})
@@ -74,10 +71,8 @@ target_include_directories(my-gui_lib PUBLIC ${my-gui_inc})
 set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
 set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)
 file(GLOB shaders
-  ${PROJECT_SHADER_PATH}/shader.vert
-  ${PROJECT_SHADER_PATH}/shader.frag
-  ${PROJECT_SHADER_PATH}/canvas_shader.vert
-  ${PROJECT_SHADER_PATH}/canvas_shader.frag)
+  ${PROJECT_SHADER_PATH}/*.frag
+  ${PROJECT_SHADER_PATH}/*.vert)
 
 set(GLSL_VALIDATOR "/bin/glslangValidator")
 

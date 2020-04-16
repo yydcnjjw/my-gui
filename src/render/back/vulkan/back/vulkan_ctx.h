@@ -4,15 +4,6 @@
 
 namespace my {
 
-class VulkanPlatformSurface {
-  public:
-    virtual ~VulkanPlatformSurface() = default;
-
-    [[nodiscard]] virtual std::vector<const char *>
-    get_require_surface_extension() const = 0;
-    [[nodiscard]] virtual vk::SurfaceKHR get_surface(vk::Instance) const = 0;
-};
-
 enum VulkanQueueType {
     VK_QUEUE_GRAPHICS,
     VK_QUEUE_COMPUTE,

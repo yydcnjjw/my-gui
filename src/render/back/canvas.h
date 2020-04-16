@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "draw_list.h"
-#include "vulkan_ctx.h"
+
 namespace my {
 
 class Canvas {

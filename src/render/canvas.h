@@ -6,21 +6,25 @@
 #include <stack>
 #include <vector>
 
-#include "logger.h"
-#include "font_mgr.h"
+#include <render/window/window_mgr.h>
+#include <storage/font_mgr.h>
+#include <storage/resource_mgr.hpp>
+#include <util/logger.h>
 
 namespace my {
+typedef LLGL::RenderSystem RenderSystem;
+typedef glm::u8vec4 ColorRGBAub;
 
 struct DrawVert {
     glm::vec2 pos;
     glm::vec2 uv;
-    glm::u8vec4 col = {255, 255, 255, 255};
+    ColorRGBAub col{255, 255, 255, 255};
 };
 
-class DrawList;
+class Canvas;
 class DrawPath {
   public:
-    friend class DrawList;
+    friend class Canvas;
     DrawPath() : DrawPath({0.0f, 0.0f}) {}
     DrawPath(const glm::vec2 begin);
 
@@ -43,12 +47,10 @@ class DrawPath {
         return *this;                                                          \
     }
 
-typedef void *TextureID;
-
 struct DrawState {
-    TextureID texture_id = nullptr;
-    bool is_font = false;
+    std::shared_ptr<Image> image;
 };
+
 struct DrawCmd {
     DrawState state;
     uint32_t elem_count;
@@ -56,43 +58,47 @@ struct DrawCmd {
     uint32_t vtx_offset = 0;
 };
 
-class DrawList {
+class Canvas {
   public:
-    DrawList &fill_rect(const glm::vec2 &a, const glm::vec2 &c,
-                        const glm::u8vec4 &col) {
+    Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
+           FontMgr *font_mgr);
+    ~Canvas();
+
+    Canvas &fill_rect(const glm::vec2 &a, const glm::vec2 &c,
+                      const ColorRGBAub &col) {
         return this->begin_path(a).rect(a, c).fill(col);
     }
 
-    DrawList &stroke_rect(const glm::vec2 &a, const glm::vec2 &c,
-                          const glm::u8vec4 &col, float line_width) {
+    Canvas &stroke_rect(const glm::vec2 &a, const glm::vec2 &c,
+                        const ColorRGBAub &col, float line_width) {
         return this->begin_path(a).rect(a, c).close_path().stroke(col,
                                                                   line_width);
     }
 
-    DrawList &begin_path(const glm::vec2 &pos) {
+    Canvas &begin_path(const glm::vec2 &pos) {
         this->_current_path.reset(new DrawPath(pos));
         return *this;
     }
 
-    DrawList &line_to(const glm::vec2 &pos) {
+    Canvas &line_to(const glm::vec2 &pos) {
         _CHECK_CURRENT_PATH;
         this->_current_path->line_to(pos);
         return *this;
     }
 
-    DrawList &rect(const glm::vec2 &a, const glm::vec2 &c) {
+    Canvas &rect(const glm::vec2 &a, const glm::vec2 &c) {
         _CHECK_CURRENT_PATH;
         this->_current_path->rect(a, c);
         return *this;
     }
 
-    DrawList &close_path() {
+    Canvas &close_path() {
         _CHECK_CURRENT_PATH;
         this->line_to(this->_current_path->_points.front());
         return *this;
     }
 
-    DrawList &fill(const glm::u8vec4 &col) {
+    Canvas &fill(const glm::u8vec4 &col) {
         _CHECK_CURRENT_PATH;
 
         this->_add_convex_poly_fill(*this->_current_path, col);
@@ -100,26 +106,25 @@ class DrawList {
         return *this;
     }
 
-    DrawList &stroke(const glm::u8vec4 &col, float line_width) {
+    Canvas &stroke(const ColorRGBAub &col, float line_width) {
         _CHECK_CURRENT_PATH;
 
         this->_add_poly_line(*this->_current_path, col, line_width);
         this->_current_path.reset();
         return *this;
     }
-    DrawList &draw_image(TextureID id, const glm::vec2 &p_min,
-                         const glm::vec2 &p_max,
-                         const glm::vec2 &uv_min = {0, 0},
-                         const glm::vec2 &uv_max = {1, 1}, uint8_t alpha = 255);
 
-    DrawList &fill_text(const char *text, const glm::vec2 &pos,
-                        my::Font *font, float font_size,
-                        const glm::u8vec4 &color);
+    Canvas &draw_image(std::shared_ptr<Image> image, const glm::vec2 &p_min,
+                       const glm::vec2 &p_max, const glm::vec2 &uv_min = {0, 0},
+                       const glm::vec2 &uv_max = {1, 1}, uint8_t alpha = 255);
 
-    const std::vector<DrawVert> &get_draw_vtx() { return this->_vtx_list; }
+    Canvas &fill_text(const char *text, const glm::vec2 &pos,
+                      my::Font *font = nullptr, float font_size = 16,
+                      const ColorRGBAub &color = {255, 255, 255, 255});
 
-    const std::vector<uint32_t> &get_draw_idx() { return this->_idx_list; }
     const std::vector<DrawCmd> &get_draw_cmd();
+
+    void render();
 
     void clear() {
         this->_vtx_list.clear();
@@ -130,8 +135,37 @@ class DrawList {
     }
 
   private:
+    RenderSystem *_renderer;
+    LLGL::RenderContext *_context;
+    LLGL::PipelineState *_pipeline;
+    LLGL::PipelineLayout *_pipeline_layout;
+    LLGL::CommandQueue *_queue;
+    LLGL::CommandBuffer *_commands;
+
+    LLGL::VertexFormat _vertex_format;
     std::vector<DrawVert> _vtx_list;
     std::vector<uint32_t> _idx_list;
+    LLGL::Buffer *_vtx_buf = nullptr;
+    LLGL::Buffer *_idx_buf = nullptr;
+    LLGL::ResourceHeap *_default_resource;
+
+    LLGL::Sampler *_sampler;
+
+    my::Font *_default_font;
+    LLGL::Texture *_font_tex;
+    struct ConstBlock {
+        glm::vec2 scale;
+        glm::vec2 translate;
+    };
+
+    ConstBlock _const_block;
+    LLGL::Buffer *_constant;
+
+    struct Texture {
+        LLGL::Texture *texture;
+        LLGL::ResourceHeap *resource;
+    };
+    std::unordered_map<std::string, Texture> _textures;
 
     // first cmd
     std::vector<DrawCmd> _cmd_list;
@@ -153,13 +187,13 @@ class DrawList {
     void _restore();
 
     void _prim_rect(const glm::vec2 &a, const glm::vec2 &c,
-                    const glm::u8vec4 &col);
+                    const ColorRGBAub &col);
     void _prim_rect_uv(const glm::vec2 &a, const glm::vec2 &c,
                        const glm::vec2 &uv_a, const glm::vec2 &uv_c,
-                       const glm::u8vec4 &col = {0, 0, 0, 0});
+                       const ColorRGBAub &col = {0, 0, 0, 0});
 
-    void _add_poly_line(const DrawPath &, const glm::u8vec4 &col,
+    void _add_poly_line(const DrawPath &, const ColorRGBAub &col,
                         float line_width);
-    void _add_convex_poly_fill(const DrawPath &, const glm::u8vec4 &col);
+    void _add_convex_poly_fill(const DrawPath &, const ColorRGBAub &col);
 };
 } // namespace my

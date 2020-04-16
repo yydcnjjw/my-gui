@@ -1,11 +1,11 @@
 #pragma once
 
 #include <my_gui.h>
-#include <async_task.hpp>
-#include <event_bus.hpp>
-#include <font_mgr.h>
-#include <resource_mgr.hpp>
-#include <window_mgr.h>
+#include <util/async_task.hpp>
+#include <util/event_bus.hpp>
+#include <storage/font_mgr.h>
+#include <storage/resource_mgr.hpp>
+#include <render/window/window_mgr.h>
 
 namespace my {
 

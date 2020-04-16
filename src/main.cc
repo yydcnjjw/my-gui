@@ -203,75 +203,59 @@
 //     GLOG_E(e.what());
 // }
 // }
+#include <LLGL/Log.h>
+#include <render/canvas.h>
+#include <render/window/window_mgr.h>
+#include <storage/resource_mgr.hpp>
+#include <util/event_bus.hpp>
+#include <boost/timer/timer.hpp>
 
-#include <fstream>
-#include <iostream>
 
-#include <boost/locale/encoding.hpp>
+#include <util/logger.h>
 
-// #include <codecvt.h>
-// #include <font_mgr.h>
-// #include <async_task.hpp>
-#include <boost/iostreams/copy.hpp>
-#include <fstream>
-#include <logger.h>
-#include <sstream>
-// #include <storage/archive.h>
-#include <resource_mgr.hpp>
+class MyDebugger : public LLGL::RenderingDebugger {
+    void OnError(LLGL::ErrorType, Message &message) override {
+        GLOG_D(message.ToReportString("").c_str());
+    }
 
-#include <boost/gil.hpp>
-#include <boost/gil/extension/io/png.hpp>
-#include <boost/gil/io/read_image.hpp>
-
-namespace conv = boost::locale::conv;
+    void OnWarning(LLGL::WarningType, Message &message) override {
+        GLOG_D(message.ToReportString("").c_str());
+    }
+};
 
 int main(int, char *[]) {
+    LLGL::Log::SetReportCallbackStd();
 
     auto async_task = my::AsyncTask::create();
     auto resource_mgr = my::ResourceMgr::create(async_task.get());
 
-    auto script =
-        resource_mgr
-            ->load_from_uri<my::TJS2Script>(my::uri(
-                "file:///home/yydcnjjw/workspace/code/project/my-gui/debug/"
-                "deploy/assets/models/data.xp3?path=system/initialize.tjs"))
-            .get();
+    auto tex = resource_mgr->load_from_path<my::Image>("/home/yydcnjjw/workspace/code/project/my-gui/assets/textures/texture.jpg").get();
+    
+    auto font_mgr = my::FontMgr::create();
+    auto ev_bus = my::EventBus::create();
+    auto win_mgr = my::WindowMgr::create(ev_bus.get());
+    auto win = win_mgr->create_window("test", 800, 800);
 
-    auto img1 =
-        resource_mgr
-            ->load_from_uri<my::Texture>(my::uri(
-                "file:///home/yydcnjjw/workspace/code/project/my-gui/debug/"
-                "deploy/assets/models/data.xp3?path=image/title.png"))
-            .get();
+    auto debugger = std::make_shared<MyDebugger>();
 
-    // auto img2 =
-    //     resource_mgr
-    //         ->load_from_path<my::Texture>("../assets/textures/chalet.jpg")
-    //         .get();
+    auto renderer = LLGL::RenderSystem::Load("Vulkan");
 
-    img1->raw_data();
+    // auto renderer = LLGL::RenderSystem::Load("OpenGL");
+    auto canvas = my::Canvas(renderer.get(), win, resource_mgr.get(), font_mgr.get());
 
-
-    // GLOG_D(s.str().c_str());
+    bool is_quit = false;
+    ev_bus->on_event<my::QuitEvent>().subscribe(
+        [&](const auto &) { is_quit = true; });
+    
+    while (!is_quit) {
+        canvas.fill_rect({300, 300}, {500, 500}, {255, 255, 255, 100});
+        canvas.fill_rect({200, 200}, {400, 400}, {0, 0, 255, 255});
+        canvas.fill_rect({100, 100}, {300, 300}, {255, 0, 255, 255});
+        canvas.draw_image(tex, {500, 500}, {600, 600});
+        canvas.fill_text("你好", {100, 100});
+        canvas.render();
+    }
 
     Logger::get()->close();
-    // try {
-    //     auto xp3_archive =
-    //     my::Archive::make_xp3("../assets/models/data.xp3"); auto iss =
-    //     xp3_archive->open("system/initialize.tjs"); auto s = iss->read_all();
-    //     std::ofstream ofs("initialize.tjs");
-    //     ofs << s;
-    // } catch (std::exception &e) {
-    //     std::cout << e.what() << std::endl;
-    // }
-
-    // auto font_mgr = my::FontMgr::create();
-
-    // auto font =
-    // font_mgr->add_font("../assets/fonts/NotoSansCJK-Regular.ttc");
-    // font->get_tex_as_alpha();
-    // auto app = my::new_application(argc, argv);
-    // app->run();
-    // run();
     return 0;
 }

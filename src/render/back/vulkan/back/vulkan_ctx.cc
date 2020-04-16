@@ -316,6 +316,7 @@ class MyVulkanCtx : public my::VulkanCtx {
         if (_queues.find(type) == _queues.end()) {
             throw std::runtime_error("device is not be created");
         }
+        vk::Queue queue;
         return _queues[type].queue;
     }
 

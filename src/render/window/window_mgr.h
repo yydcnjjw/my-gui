@@ -1,7 +1,10 @@
 #pragma once
 
-#include "event_bus.hpp"
-#include "vulkan_ctx.h"
+#include <util/event_bus.hpp>
+#include <SDL2/SDL.h>
+#include <glm/glm.hpp>
+#include <LLGL/LLGL.h>
+#include <LLGL/Platform/NativeHandle.h>
 
 namespace my {
 typedef uint32_t WindowID;
@@ -67,10 +70,11 @@ struct Size2D {
     Size2D(u_int32_t w, u_int32_t h) : w(w), h(h) {}
 };
 
-class Window : public VulkanPlatformSurface {
+class Window {
   public:
     virtual ~Window() = default;
 
+    virtual std::shared_ptr<LLGL::Surface> get_surface() = 0;
     virtual WindowID get_window_id() = 0;
     virtual void hide() = 0;
     virtual void show() = 0;
@@ -88,12 +92,6 @@ class Window : public VulkanPlatformSurface {
     virtual PixelPos get_pos() = 0;
     virtual void set_pos(const PixelPos &) = 0;
     virtual void set_full_screen(bool) = 0;
-
-    [[nodiscard]] virtual std::vector<const char *>
-    get_require_surface_extension() const = 0;
-
-    [[nodiscard]] virtual vk::SurfaceKHR
-    get_surface(vk::Instance instance) const = 0;
 };
 
 struct DisplayMode {

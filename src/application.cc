@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include <logger.h>
+#include <util/logger.h>
 
 namespace {
 namespace program_options = boost::program_options;

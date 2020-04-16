@@ -1,23 +1,67 @@
 #include "window_mgr.h"
 
-// #define GLFW_INCLUDE_VULKAN
-// #include <GLFW/glfw3.h>
-
+#include <GL/glx.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
 #include <SDL2/SDL_vulkan.h>
-
-#include "logger.h"
-#include "util.hpp"
-#include "vulkan_ctx.h"
+// #include <render/vulkan/instance.hpp>
+#include <util/logger.h>
 
 namespace {
 
 class SDLWindow : public my::Window {
   public:
+    class SDLSurface : public LLGL::Surface {
+      public:
+        SDLSurface(SDLWindow *win) : _win(win) {}
+
+        bool GetNativeHandle(void *nativeHandle, std::size_t) const override {
+            auto handle = reinterpret_cast<LLGL::NativeHandle *>(nativeHandle);
+            SDL_SysWMinfo info;
+            SDL_VERSION(&info.version);
+            if (!::SDL_GetWindowWMInfo(this->_win->_sdl_window, &info)) {
+                throw std::runtime_error(SDL_GetError());
+            }
+            handle->display = info.info.x11.display;
+            handle->window = info.info.x11.window;
+
+            return true;
+        };
+
+        LLGL::Extent2D GetContentSize() const override {
+            auto size = this->_win->get_frame_buffer_size();
+            return {size.w, size.h};
+        };
+
+        bool
+        AdaptForVideoMode(LLGL::VideoModeDescriptor &videoModeDesc) override {
+            this->_win->set_size({videoModeDesc.resolution.width,
+                                  videoModeDesc.resolution.height});
+            this->_win->set_full_screen(videoModeDesc.fullscreen);
+            return true;
+        }
+
+        void ResetPixelFormat() override {}
+
+        bool ProcessEvents() override { return true; }
+
+        std::unique_ptr<LLGL::Display> FindResidentDisplay() const override {
+            return std::move(LLGL::Display::InstantiateList().front());
+        };
+
+      private:
+        SDLWindow *_win;
+    };
+
     SDLWindow(SDL_Window *win)
-        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)) {}
+        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)),
+          _surface(std::make_shared<SDLSurface>(this)) {}
 
     ~SDLWindow() { SDL_DestroyWindow(this->_sdl_window); }
+
+    std::shared_ptr<LLGL::Surface> get_surface() override {
+        return this->_surface;
+    };
 
     my::Size2D get_frame_buffer_size() override {
         // TODO: gl vulkan
@@ -83,43 +127,49 @@ class SDLWindow : public my::Window {
         SDL_WarpMouseInWindow(this->_sdl_window, pos.x, pos.y);
     }
 
-    [[nodiscard]] virtual std::vector<const char *>
-    get_require_surface_extension() const override {
-        unsigned int count = 0;
-        if (!SDL_Vulkan_GetInstanceExtensions(this->_sdl_window, &count,
-                                              nullptr)) {
-            throw std::runtime_error(SDL_GetError());
-        }
-
-        std::vector<const char *> extensions(count);
-
-        if (!SDL_Vulkan_GetInstanceExtensions(this->_sdl_window, &count,
-                                              extensions.data())) {
-            throw std::runtime_error(SDL_GetError());
-        }
-
-        return extensions;
-    }
-
-    [[nodiscard]] virtual vk::SurfaceKHR
-    get_surface(vk::Instance instance) const override {
-        VkSurfaceKHR s;
-        if (!SDL_Vulkan_CreateSurface(this->_sdl_window, instance, &s)) {
-            throw std::runtime_error(SDL_GetError());
-        }
-        return s;
-    }
-
-  private:
     SDL_Window *_sdl_window;
     my::WindowID _win_id;
+    std::shared_ptr<SDLSurface> _surface;
 };
+
+// class SDLPlatform : public my::render::vulkan::Platform {
+//   public:
+//     std::vector<const char *> require_extension() override {
+//         unsigned int count = 0;
+//         if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count, nullptr))
+//         {
+//             throw std::runtime_error(SDL_GetError());
+//         }
+
+//         std::vector<const char *> extensions(count);
+
+//         if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count,
+//                                               extensions.data())) {
+//             throw std::runtime_error(SDL_GetError());
+//         }
+
+//         return extensions;
+//     }
+
+//     vk::SurfaceKHR
+//     create_surface(my::Window *_win,
+//                    const my::render::vulkan::Instance &instance) override
+//                    {
+//         SDLWindow *win = reinterpret_cast<SDLWindow *>(_win);
+//         VkSurfaceKHR s;
+//         if (!SDL_Vulkan_CreateSurface(win->_sdl_window,
+//                                       instance._vk_instance.get(), &s)) {
+//             throw std::runtime_error(SDL_GetError());
+//         }
+//         return s;
+//     }
+// };
 
 class SDLWindowMgr : public my::WindowMgr {
 
   public:
     SDLWindowMgr(my::EventBus *bus) {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_WINDOW_OPENGL) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
 
@@ -240,4 +290,14 @@ namespace my {
 std::unique_ptr<WindowMgr> WindowMgr::create(EventBus *bus) {
     return std::make_unique<SDLWindowMgr>(bus);
 }
+
+namespace render {
+namespace vulkan {
+// std::shared_ptr<Platform> Platform::create() {
+//     return std::make_shared<SDLPlatform>();
+// }
+} // namespace vulkan
+
+} // namespace render
+
 } // namespace my

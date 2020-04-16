@@ -1,13 +1,13 @@
 #include "font_mgr.h"
 
-#include <logger.h>
+#include <util/logger.h>
+#define STB_RECT_PACK_IMPLEMENTATION
+#include <util/stb_rect_pack.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
-#define STB_RECT_PACK_IMPLEMENTATION
 #include <glm/glm.hpp>
 #include <msdfgen.h>
-#include <stb_rect_pack.h>
 
 #define FT_CEIL(X) (((X + 63) & -64) / 64)
 
