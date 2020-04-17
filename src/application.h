@@ -1,11 +1,12 @@
 #pragma once
 
+#include <media/audio_mgr.h>
 #include <my_gui.h>
-#include <util/async_task.hpp>
-#include <util/event_bus.hpp>
+#include <render/window/window_mgr.h>
 #include <storage/font_mgr.h>
 #include <storage/resource_mgr.hpp>
-#include <render/window/window_mgr.h>
+#include <util/async_task.hpp>
+#include <util/event_bus.hpp>
 
 namespace my {
 
@@ -22,6 +23,7 @@ class Application {
     virtual FontMgr *font_mgr() const = 0;
     virtual AsyncTask *async_task() const = 0;
     virtual ResourceMgr *resource_mgr() const = 0;
+    virtual AudioMgr *audio_mgr() const = 0;
     virtual bool
     get_program_option(const std::string &option,
                        program_options::variable_value &value) const = 0;

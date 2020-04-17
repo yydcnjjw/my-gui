@@ -22,19 +22,20 @@ set(my-gui_src
   storage/font_mgr.cc
   render/window/window_mgr.cc
   render/canvas.cc
+  media/audio_mgr.cc
   )
 
 find_package(Threads REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
+find_package(SDL2Mixer REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread program_options iostreams locale timer)
-find_package(FFMPEG REQUIRED)
+# find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
-find_package(X11 REQUIRED)
 
 set(DEPS
   Threads::Threads
@@ -42,19 +43,19 @@ set(DEPS
   glm::glm
   rxcpp
   SDL2::SDL2
+  ${SDL2Mixer_LIBRARIES}
   Boost::thread
   Boost::program_options
   Boost::iostreams
   Boost::locale
   Boost::timer  
-  ${FFMPEG_LIBRARIES}
+  # ${FFMPEG_LIBRARIES}
   Freetype::Freetype
-  ${msdfgen_lib}
   Vulkan::Vulkan
   PNG::PNG
   JPEG::JPEG
   ${LLGL_lib}
-  X11::Xutil
+  ${msdfgen_lib}
   )
 
 add_executable(my-gui ${my-gui_src})

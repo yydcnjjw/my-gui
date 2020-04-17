@@ -31,7 +31,8 @@ class Font {
     virtual unsigned char *get_tex_as_alpha(int *out_w = nullptr,
                                             int *out_h = nullptr) = 0;
 
-    virtual uint32_t get_default_font_size() const = 0;
+    virtual uint32_t font_size() const = 0;
+    virtual glm::vec2 white_pixels_uv() = 0;
 
     typedef std::pair<wchar_t, wchar_t> GlyphRange;
     const std::vector<GlyphRange> &get_glyph_ranges_default() {

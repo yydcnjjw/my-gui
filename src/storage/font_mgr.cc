@@ -29,7 +29,6 @@ struct GlyphData {
           advance_x(FT_CEIL(slot->advance.x)) {}
 };
 
-
 void blit_glyph(const FT_Bitmap *ft_bitmap, uint8_t *dst, uint32_t dst_pitch) {
     assert(dst);
     const auto w = ft_bitmap->width;
@@ -64,19 +63,19 @@ void blit_glyph(const FT_Bitmap *ft_bitmap, uint8_t *dst, uint32_t dst_pitch) {
 
 class MyFont : public my::Font {
   public:
-    MyFont(FT_Library ft_lib, const char *path) : _default_font_size(16) {
+    MyFont(FT_Library ft_lib, const char *path) : _font_size(16) {
         FT_Error e = ::FT_New_Face(ft_lib, path, 0, &this->_ft_face);
         if (e) {
             throw std::runtime_error(FT_Error_String(e));
         }
 
-        FT_Set_Pixel_Sizes(this->_ft_face, 0, this->_default_font_size);
+        FT_Set_Pixel_Sizes(this->_ft_face, 0, this->_font_size);
     }
     ~MyFont() { FT_Done_Face(this->_ft_face); }
 
-    uint32_t get_default_font_size() const override {
-        return this->_default_font_size;
-    };
+    uint32_t font_size() const override { return this->_font_size; };
+
+    glm::vec2 white_pixels_uv() override { return this->_white_pixels_uv; }
 
     u_char *get_tex_as_alpha(int *out_w, int *out_h) override {
         if (this->_alpha_tex) {
@@ -165,16 +164,20 @@ class MyFont : public my::Font {
         ::stbrp_init_target(&pack_ctx, TEX_WIDTH, TEX_HEIGHT_MAX,
                             pack_nodes.data(), pack_nodes.size());
 
-        std::vector<stbrp_rect> rects(glyphs.size());
+        std::vector<stbrp_rect> rects(glyphs.size() + 1);
         for (size_t i = 0; i < glyphs.size(); i++) {
             rects[i].w = glyphs[i].w;
             rects[i].h = glyphs[i].h;
         }
 
+        auto white_pixels = rects.back();
+        white_pixels.w = this->_font_size;
+        white_pixels.h = this->_font_size;
+
         ::stbrp_pack_rects(&pack_ctx, rects.data(), rects.size());
 
         int tex_h = 0;
-        for (size_t i = 0; i < rects.size(); i++) {
+        for (size_t i = 0; i < rects.size() - 1; i++) {
             if (!rects[i].was_packed) {
                 continue;
             }
@@ -220,6 +223,17 @@ class MyFont : public my::Font {
                 {u1, v1}};
         }
 
+        // set white pixels
+        auto blit_src_stride = white_pixels.w;
+        auto blit_dst_stride = this->_tex_w;
+        auto blit_dst =
+            this->_alpha_tex + (white_pixels.y * this->_tex_w) + white_pixels.x;
+        for (int y = white_pixels.h; y > 0; y--, blit_dst += blit_dst_stride) {
+            memset(blit_dst, 255, blit_src_stride);
+        }
+        this->_white_pixels_uv = {
+            white_pixels.x + white_pixels.w / 2 / (float)this->_tex_w,
+            white_pixels.y + white_pixels.h / 2 / (float)this->_tex_h};
         if (out_w) {
             *out_w = this->_tex_w;
         }
@@ -259,11 +273,12 @@ class MyFont : public my::Font {
     FT_Face _ft_face;
 
   private:
-    uint32_t _default_font_size;
+    uint32_t _font_size;
     u_char *_rgb32_tex = nullptr;
     u_char *_alpha_tex = nullptr;
     size_t _tex_w;
     size_t _tex_h;
+    glm::vec2 _white_pixels_uv;
     std::map<wchar_t, my::FontGlyph> _glyph_map;
 };
 

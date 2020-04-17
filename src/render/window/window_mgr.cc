@@ -1,10 +1,8 @@
 #include "window_mgr.h"
 
-#include <GL/glx.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 #include <SDL2/SDL_vulkan.h>
-// #include <render/vulkan/instance.hpp>
 #include <util/logger.h>
 
 namespace {
@@ -132,44 +130,11 @@ class SDLWindow : public my::Window {
     std::shared_ptr<SDLSurface> _surface;
 };
 
-// class SDLPlatform : public my::render::vulkan::Platform {
-//   public:
-//     std::vector<const char *> require_extension() override {
-//         unsigned int count = 0;
-//         if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count, nullptr))
-//         {
-//             throw std::runtime_error(SDL_GetError());
-//         }
-
-//         std::vector<const char *> extensions(count);
-
-//         if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count,
-//                                               extensions.data())) {
-//             throw std::runtime_error(SDL_GetError());
-//         }
-
-//         return extensions;
-//     }
-
-//     vk::SurfaceKHR
-//     create_surface(my::Window *_win,
-//                    const my::render::vulkan::Instance &instance) override
-//                    {
-//         SDLWindow *win = reinterpret_cast<SDLWindow *>(_win);
-//         VkSurfaceKHR s;
-//         if (!SDL_Vulkan_CreateSurface(win->_sdl_window,
-//                                       instance._vk_instance.get(), &s)) {
-//             throw std::runtime_error(SDL_GetError());
-//         }
-//         return s;
-//     }
-// };
-
 class SDLWindowMgr : public my::WindowMgr {
 
   public:
     SDLWindowMgr(my::EventBus *bus) {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_WINDOW_OPENGL) != 0) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
 
@@ -290,14 +255,5 @@ namespace my {
 std::unique_ptr<WindowMgr> WindowMgr::create(EventBus *bus) {
     return std::make_unique<SDLWindowMgr>(bus);
 }
-
-namespace render {
-namespace vulkan {
-// std::shared_ptr<Platform> Platform::create() {
-//     return std::make_shared<SDLPlatform>();
-// }
-} // namespace vulkan
-
-} // namespace render
 
 } // namespace my

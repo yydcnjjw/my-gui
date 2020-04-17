@@ -10,11 +10,10 @@ class PosixApplication : public my::Application {
   public:
     PosixApplication(int argc, char **argv,
                      const program_options::options_description &opts_desc)
-        : _ev_bus(my::EventBus::create()),
-          _async_task(my::AsyncTask::create()),
+        : _ev_bus(my::EventBus::create()), _async_task(my::AsyncTask::create()),
           _win_mgr(my::WindowMgr::create(this->_ev_bus.get())),
           _resource_mgr(my::ResourceMgr::create(this->_async_task.get())),
-          _font_mgr(my::FontMgr::create()) {
+          _font_mgr(my::FontMgr::create()), _audio_mgr(my::AudioMgr::create()) {
         // XXX:
         pthread_setname_np(pthread_self(), "main");
         this->_parse_program_options(argc, argv, opts_desc);
@@ -34,12 +33,8 @@ class PosixApplication : public my::Application {
     void quit() override { this->_ev_bus->post<my::QuitEvent>(); }
 
     my::EventBus *ev_bus() const override { return this->_ev_bus.get(); }
-    my::WindowMgr *win_mgr() const override {
-        return this->_win_mgr.get();
-    };
-    my::FontMgr *font_mgr() const override {
-        return this->_font_mgr.get();
-    }
+    my::WindowMgr *win_mgr() const override { return this->_win_mgr.get(); };
+    my::FontMgr *font_mgr() const override { return this->_font_mgr.get(); }
 
     my::AsyncTask *async_task() const override {
         return this->_async_task.get();
@@ -47,6 +42,10 @@ class PosixApplication : public my::Application {
 
     my::ResourceMgr *resource_mgr() const override {
         return this->_resource_mgr.get();
+    }
+
+    my::AudioMgr *audio_mgr() const override {
+        return this->_audio_mgr.get();
     }
 
     program_options::option_description &get_option_desc() {
@@ -72,7 +71,8 @@ class PosixApplication : public my::Application {
     std::unique_ptr<my::WindowMgr> _win_mgr;
     std::unique_ptr<my::ResourceMgr> _resource_mgr;
     std::unique_ptr<my::FontMgr> _font_mgr;
-    
+    std::unique_ptr<my::AudioMgr> _audio_mgr;
+
     void
     _parse_program_options(int argc, char **argv,
                            const program_options::options_description &opts) {

@@ -221,7 +221,7 @@ Canvas &Canvas::fill_text(const char *text, const glm::vec2 &p, my::Font *font,
         font = this->_default_font;
     }
 
-    float scale = font_size / font->get_default_font_size();
+    float scale = font_size / font->font_size();
 
     glm::vec2 pos = p;
     pos.y += font_size;
@@ -310,8 +310,8 @@ void Canvas::_add_poly_line(const DrawPath &path, const ColorRGBAub &col,
     if (point_count < 2) {
         return;
     }
-
-    glm::vec2 uv;
+    
+    glm::vec2 uv = this->_default_font->white_pixels_uv();
 
     size_t count = point_count - 1;
 
@@ -354,7 +354,7 @@ void Canvas::_add_convex_poly_fill(const DrawPath &path,
                                    const ColorRGBAub &col) {
     const size_t point_count = path._points.size();
 
-    glm::vec2 uv;
+    glm::vec2 uv = this->_default_font->white_pixels_uv();
 
     // const size_t idx_count = (point_count - 2) * 3;
     const size_t vtx_count = point_count;
