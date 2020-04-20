@@ -3,7 +3,7 @@
 #include <rx.hpp>
 
 #include <bitset>
-#include <mutex>
+#include <shared_mutex>
 
 class Logger {
   public:

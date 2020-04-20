@@ -115,8 +115,23 @@ class SDLWindow : public my::Window {
 
     my::WindowID get_window_id() override { return this->_win_id; }
 
-    void hide() override { SDL_HideWindow(this->_sdl_window); };
-    void show() override { SDL_ShowWindow(this->_sdl_window); }
+    void hide() override { this->set_visible(false); };
+    void show() override { this->set_visible(true); }
+
+    void set_visible(bool visible) override {
+        if (visible == this->_is_visible) {
+            return;
+        }
+        if (visible) {
+            SDL_ShowWindow(this->_sdl_window);
+        } else {
+            SDL_HideWindow(this->_sdl_window);
+        }
+        this->_is_visible = visible;
+    }
+
+    bool is_visible() override { return this->_is_visible; }
+
     void show_cursor(bool toggle) override {
         SDL_ShowCursor(toggle ? SDL_ENABLE : SDL_DISABLE);
     }
@@ -128,6 +143,7 @@ class SDLWindow : public my::Window {
     SDL_Window *_sdl_window;
     my::WindowID _win_id;
     std::shared_ptr<SDLSurface> _surface;
+    bool _is_visible{true};
 };
 
 class SDLWindowMgr : public my::WindowMgr {
@@ -151,8 +167,8 @@ class SDLWindowMgr : public my::WindowMgr {
                 SDL_WaitEventTimeout(&sdl_event, 200);
                 switch (sdl_event.type) {
                 case SDL_QUIT:
-                    bus->post<my::QuitEvent>();
-                    this->_is_exit = true;
+                    // bus->post<my::QuitEvent>();
+                    // this->_is_exit = true;
                     break;
                 case SDL_MOUSEMOTION:
                     bus->post<my::MouseMotionEvent>(

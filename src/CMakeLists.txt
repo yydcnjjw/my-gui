@@ -30,13 +30,13 @@ find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2Mixer REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread program_options iostreams locale timer)
-# find_package(FFMPEG REQUIRED)
+find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
-
+message("ffmpeg: ${FFMPEG_LIBRARIES}")
 set(DEPS
   Threads::Threads
   ${CMAKE_DL_LIBS}
@@ -49,7 +49,7 @@ set(DEPS
   Boost::iostreams
   Boost::locale
   Boost::timer  
-  # ${FFMPEG_LIBRARIES}
+  ${FFMPEG_LIBRARIES}
   Freetype::Freetype
   Vulkan::Vulkan
   PNG::PNG

@@ -33,7 +33,10 @@ using async_callback = std::function<void(std::shared_ptr<promise<T>>)>;
 class AsyncTask {
   public:
     AsyncTask() : _pool(4) {}
-    ~AsyncTask() { this->_pool.join(); };
+    ~AsyncTask() {
+        this->_pool.stop();
+        this->_pool.join();
+    };
 
     template <typename T, typename Callback>
     future<T> do_async(Callback &&callback) {
@@ -65,7 +68,14 @@ class AsyncTask {
                 on_timer, boost::asio::placeholders::error, this));
         }
 
+        bool is_cancel() {
+            return this->_cancel;
+        }
+
         void cancel() {
+            if (this->_cancel) {
+                return;
+            }
             this->_cancel = true;
             this->_timer.cancel();
         }

@@ -4,6 +4,7 @@
 
 #include <util/codecvt.h>
 
+#include <boost/format.hpp>
 namespace my {
 
 DrawPath::DrawPath(const glm::vec2 begin) { this->_points.push_back(begin); }
@@ -164,6 +165,8 @@ Canvas::Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
         this->_queue = renderer->GetCommandQueue();
         this->_commands = renderer->CreateCommandBuffer();
     }
+
+    { this->_fence = renderer->CreateFence(); }
 }
 
 Canvas::~Canvas() {
@@ -187,24 +190,26 @@ Canvas &Canvas::draw_image(std::shared_ptr<Image> image, const glm::vec2 &p_min,
     this->_save();
     this->_get_state().image = image;
 
-    LLGL::SrcImageDescriptor src_image_desc{
-        LLGL::ImageFormat::RGBA, LLGL::DataType::UInt8, image->raw_data(),
-        image->width() * image->height() * 4};
-    auto texture = this->_renderer->CreateTexture(
-        LLGL::Texture2DDesc(LLGL::Format::RGBA8UNorm, image->width(),
-                            image->height()),
-        &src_image_desc);
-
-    LLGL::ResourceHeapDescriptor resource_heap_desc;
     {
-        resource_heap_desc.pipelineLayout = this->_pipeline_layout;
-        resource_heap_desc.resourceViews = {this->_constant, texture,
-                                            this->_sampler};
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+        LLGL::SrcImageDescriptor src_image_desc{
+            LLGL::ImageFormat::RGBA, LLGL::DataType::UInt8, image->raw_data(),
+            image->width() * image->height() * 4};
+        auto texture = this->_renderer->CreateTexture(
+            LLGL::Texture2DDesc(LLGL::Format::RGBA8UNorm, image->width(),
+                                image->height()),
+            &src_image_desc);
+
+        LLGL::ResourceHeapDescriptor resource_heap_desc;
+        {
+            resource_heap_desc.pipelineLayout = this->_pipeline_layout;
+            resource_heap_desc.resourceViews = {this->_constant, texture,
+                                                this->_sampler};
+        }
+
+        auto resource = this->_renderer->CreateResourceHeap(resource_heap_desc);
+        this->_textures.insert({image->get_key(), {texture, resource}});
     }
-
-    auto resource = this->_renderer->CreateResourceHeap(resource_heap_desc);
-
-    this->_textures.insert({image->get_key(), {texture, resource}});
 
     this->_prim_rect_uv(p_min, p_max, uv_min, uv_max, {255, 255, 255, alpha});
 
@@ -212,8 +217,9 @@ Canvas &Canvas::draw_image(std::shared_ptr<Image> image, const glm::vec2 &p_min,
     return *this;
 }
 
-Canvas &Canvas::fill_text(const char *text, const glm::vec2 &p, my::Font *font,
-                          float font_size, const ColorRGBAub &color) {
+Canvas &Canvas::fill_text(const std::string &text, const glm::vec2 &p,
+                          my::Font *font, float font_size,
+                          const ColorRGBAub &color) {
     std::wstring wtext = codecvt::utf_to_utf<wchar_t>(text);
     this->_save();
     this->_get_state().image = nullptr;
@@ -235,6 +241,7 @@ Canvas &Canvas::fill_text(const char *text, const glm::vec2 &p, my::Font *font,
         p_min.y = pos.y - (h - glyph.h * scale) - h;
         p_max.x = p_min.x + w;
         p_max.y = p_min.y + h;
+        this->stroke_rect(p_min, p_max, {255, 0, 0, 255}, 1);
         this->_prim_rect_uv(p_min, p_max, glyph.uv0, glyph.uv1, color);
         pos.x += glyph.advance_x * scale;
     }
@@ -244,10 +251,12 @@ Canvas &Canvas::fill_text(const char *text, const glm::vec2 &p, my::Font *font,
 
 const std::vector<DrawCmd> &Canvas::get_draw_cmd() {
     this->_add_cmd();
+    std::shared_lock<std::shared_mutex> l_lock(this->_lock);
     return this->_cmd_list;
 }
 
 void Canvas::_add_cmd() {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
     auto idx_count = this->_idx_list.size();
     uint32_t elem_count;
     if (this->_cmd_list.empty()) {
@@ -270,14 +279,22 @@ void Canvas::_add_cmd() {
 }
 
 void Canvas::_save() {
-    this->_state_stack.push(this->_get_state());
+    {
+        auto &current_state = this->_get_state();
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+        this->_state_stack.push(current_state);
+    }
     this->_add_cmd();
 }
 void Canvas::_restore() {
     this->_add_cmd();
 
-    this->_set_state(this->_state_stack.top());
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+    auto &state = this->_state_stack.top();
     this->_state_stack.pop();
+    l_lock.unlock();
+
+    this->_set_state(state);
 }
 
 void Canvas::_prim_rect(const glm::vec2 &a, const glm::vec2 &c,
@@ -288,6 +305,7 @@ void Canvas::_prim_rect(const glm::vec2 &a, const glm::vec2 &c,
 void Canvas::_prim_rect_uv(const glm::vec2 &a, const glm::vec2 &c,
                            const glm::vec2 &uv_a, const glm::vec2 &uv_c,
                            const ColorRGBAub &col) {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
     glm::vec2 b(c.x, a.y), d(a.x, c.y), uv_b(uv_c.x, uv_a.y),
         uv_d(uv_a.x, uv_c.y);
     auto idx = this->_vtx_list.size();
@@ -305,12 +323,13 @@ void Canvas::_prim_rect_uv(const glm::vec2 &a, const glm::vec2 &c,
 
 void Canvas::_add_poly_line(const DrawPath &path, const ColorRGBAub &col,
                             float line_width) {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
     const size_t point_count = path._points.size();
 
     if (point_count < 2) {
         return;
     }
-    
+
     glm::vec2 uv = this->_default_font->white_pixels_uv();
 
     size_t count = point_count - 1;
@@ -352,6 +371,7 @@ void Canvas::_add_poly_line(const DrawPath &path, const ColorRGBAub &col,
 
 void Canvas::_add_convex_poly_fill(const DrawPath &path,
                                    const ColorRGBAub &col) {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
     const size_t point_count = path._points.size();
 
     glm::vec2 uv = this->_default_font->white_pixels_uv();
@@ -373,62 +393,71 @@ void Canvas::_add_convex_poly_fill(const DrawPath &path,
 }
 
 void Canvas::render() {
-    if (this->_vtx_list.empty() && this->_idx_list.empty()) {
-        return;
-    }
-
-    if (this->_vtx_buf) {
-        this->_renderer->Release(*this->_vtx_buf);
-        this->_vtx_buf = nullptr;
-    }
-    if (this->_idx_buf) {
-        this->_renderer->Release(*this->_idx_buf);
-        this->_idx_buf = nullptr;
-    }
-
-    this->_vtx_buf = this->_renderer->CreateBuffer(
-        LLGL::VertexBufferDesc(this->_vtx_list.size() * sizeof(DrawVert),
-                               this->_vertex_format),
-        this->_vtx_list.data());
-    this->_idx_buf = this->_renderer->CreateBuffer(
-        LLGL::IndexBufferDesc(this->_idx_list.size() * sizeof(uint32_t),
-                              LLGL ::Format::R32UInt),
-        this->_idx_list.data());
-
-    this->_commands->Begin();
+    auto &draw_cmd = this->get_draw_cmd();
     {
-        // Set viewport and scissor rectangle
-        this->_commands->SetViewport(this->_context->GetResolution());
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
 
-        this->_commands->SetPipelineState(*this->_pipeline);
-
-        // Set vertex buffer
-        this->_commands->SetVertexBuffer(*this->_vtx_buf);
-        this->_commands->SetIndexBuffer(*this->_idx_buf);
-
-        this->_commands->BeginRenderPass(*this->_context);
-        {
-            this->_commands->Clear(LLGL::ClearFlags::Color);
-            for (const auto &cmd : this->get_draw_cmd()) {
-                if (cmd.state.image) {
-                    auto texture =
-                        this->_textures.at(cmd.state.image->get_key()).resource;
-
-                    this->_commands->SetResourceHeap(*texture);
-                } else {
-                    this->_commands->SetResourceHeap(*this->_default_resource);
-                }
-
-                this->_commands->DrawIndexed(cmd.elem_count, 0, cmd.vtx_offset);
-            }
+        if (this->_vtx_list.empty() && this->_idx_list.empty()) {
+            return;
         }
-        this->_commands->EndRenderPass();
+
+        this->_queue->WaitIdle();
+        if (this->_vtx_buf) {
+            this->_renderer->Release(*this->_vtx_buf);
+            this->_vtx_buf = nullptr;
+        }
+        if (this->_idx_buf) {
+            this->_renderer->Release(*this->_idx_buf);
+            this->_idx_buf = nullptr;
+        }
+
+        this->_vtx_buf = this->_renderer->CreateBuffer(
+            LLGL::VertexBufferDesc(this->_vtx_list.size() * sizeof(DrawVert),
+                                   this->_vertex_format),
+            this->_vtx_list.data());
+        this->_idx_buf = this->_renderer->CreateBuffer(
+            LLGL::IndexBufferDesc(this->_idx_list.size() * sizeof(uint32_t),
+                                  LLGL ::Format::R32UInt),
+            this->_idx_list.data());
+
+        this->_commands->Begin();
+        {
+            // Set viewport and scissor rectangle
+            this->_commands->SetViewport(this->_context->GetResolution());
+
+            this->_commands->SetPipelineState(*this->_pipeline);
+
+            // Set vertex buffer
+            this->_commands->SetVertexBuffer(*this->_vtx_buf);
+            this->_commands->SetIndexBuffer(*this->_idx_buf);
+
+            this->_commands->BeginRenderPass(*this->_context);
+            {
+                // this->_commands->Clear(LLGL::ClearFlags::Color);
+                for (const auto &cmd : draw_cmd) {
+                    if (cmd.state.image) {
+                        auto texture =
+                            this->_textures.at(cmd.state.image->get_key())
+                                .resource;
+
+                        this->_commands->SetResourceHeap(*texture);
+                    } else {
+                        this->_commands->SetResourceHeap(
+                            *this->_default_resource);
+                    }
+
+                    this->_commands->DrawIndexed(cmd.elem_count, 0,
+                                                 cmd.vtx_offset);
+                }
+            }
+            this->_commands->EndRenderPass();
+        }
+        this->_commands->End();
+
+        this->_queue->Submit(*this->_commands);
+
+        this->_context->Present();
     }
-    this->_commands->End();
-
-    this->_queue->Submit(*this->_commands);
-
-    this->_context->Present();
     this->clear();
 }
 

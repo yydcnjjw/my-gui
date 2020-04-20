@@ -13,10 +13,13 @@ class PosixApplication : public my::Application {
         : _ev_bus(my::EventBus::create()), _async_task(my::AsyncTask::create()),
           _win_mgr(my::WindowMgr::create(this->_ev_bus.get())),
           _resource_mgr(my::ResourceMgr::create(this->_async_task.get())),
-          _font_mgr(my::FontMgr::create()), _audio_mgr(my::AudioMgr::create()) {
+          _font_mgr(my::FontMgr::create()), _audio_mgr(my::AudioMgr::create()),
+          _renderer(LLGL::RenderSystem::Load("Vulkan")) {
         // XXX:
         pthread_setname_np(pthread_self(), "main");
+        LLGL::Log::SetReportCallbackStd();
         this->_parse_program_options(argc, argv, opts_desc);
+        
     }
 
     ~PosixApplication() override {}
@@ -44,8 +47,10 @@ class PosixApplication : public my::Application {
         return this->_resource_mgr.get();
     }
 
-    my::AudioMgr *audio_mgr() const override {
-        return this->_audio_mgr.get();
+    my::AudioMgr *audio_mgr() const override { return this->_audio_mgr.get(); }
+
+    LLGL::RenderSystem *renderer() const override {
+        return this->_renderer.get();
     }
 
     program_options::option_description &get_option_desc() {
@@ -72,6 +77,7 @@ class PosixApplication : public my::Application {
     std::unique_ptr<my::ResourceMgr> _resource_mgr;
     std::unique_ptr<my::FontMgr> _font_mgr;
     std::unique_ptr<my::AudioMgr> _audio_mgr;
+    std::unique_ptr<LLGL::RenderSystem> _renderer;
 
     void
     _parse_program_options(int argc, char **argv,

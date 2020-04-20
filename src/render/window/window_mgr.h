@@ -78,6 +78,8 @@ class Window {
     virtual WindowID get_window_id() = 0;
     virtual void hide() = 0;
     virtual void show() = 0;
+    virtual void set_visible(bool visible) = 0;
+    virtual bool is_visible() = 0;
 
     virtual void show_cursor(bool) = 0;
     virtual void set_mouse_pos(const PixelPos&) = 0;

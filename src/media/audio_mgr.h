@@ -24,10 +24,14 @@ class AudioMgr {
     virtual ~AudioMgr() = default;
 
     virtual void play(Audio *) = 0;
+    virtual void play_fade(Audio *, int ms) = 0;    
     virtual void pause(Audio *) = 0;
-    virtual void play_fade(Audio *, int ms) = 0;
-    virtual void pause_fade(Audio *, int ms) = 0;
-    // virtual void set_panning(Audio *, uint8_t left, uint8_t right) = 0;
+    virtual bool is_paused(Audio *) = 0;
+    virtual void resume(Audio *) = 0;
+
+    virtual void stop(Audio *) = 0;
+    virtual void stop_fade(Audio *, int ms) = 0;    
+    virtual void set_panning(Audio *, uint8_t left, uint8_t right) = 0;
     // virtual void set_pos(Audio *, int16_t angle, uint8_t distance) = 0;
 
     static std::unique_ptr<AudioMgr> create();

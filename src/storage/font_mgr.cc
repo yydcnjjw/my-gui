@@ -1,5 +1,7 @@
 #include "font_mgr.h"
 
+#include <my_gui.h>
+#include <util/codecvt.h>
 #include <util/logger.h>
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <util/stb_rect_pack.h>
@@ -8,6 +10,8 @@
 #include FT_FREETYPE_H
 #include <glm/glm.hpp>
 #include <msdfgen.h>
+
+#include <boost/format.hpp>
 
 #define FT_CEIL(X) (((X + 63) & -64) / 64)
 
@@ -63,8 +67,8 @@ void blit_glyph(const FT_Bitmap *ft_bitmap, uint8_t *dst, uint32_t dst_pitch) {
 
 class MyFont : public my::Font {
   public:
-    MyFont(FT_Library ft_lib, const char *path) : _font_size(16) {
-        FT_Error e = ::FT_New_Face(ft_lib, path, 0, &this->_ft_face);
+    MyFont(FT_Library ft_lib, const std::string &path) : _font_size(16) {
+        FT_Error e = ::FT_New_Face(ft_lib, path.c_str(), 0, &this->_ft_face);
         if (e) {
             throw std::runtime_error(FT_Error_String(e));
         }
@@ -267,7 +271,11 @@ class MyFont : public my::Font {
     }
 
     const my::FontGlyph &get_glyph(wchar_t ch) override {
-        return this->_glyph_map[ch];
+        if (this->_glyph_map.find(ch) == this->_glyph_map.end()) {
+            throw std::runtime_error(
+                (boost::format("unknown glyph %1%") % ch).str());
+        }
+        return this->_glyph_map.at(ch);
     }
 
     FT_Face _ft_face;
@@ -291,20 +299,38 @@ class MyFontMgr : public my::FontMgr {
         }
     }
     ~MyFontMgr() {
-        fonts.clear();
+        _fonts.clear();
         FT_Done_FreeType(this->_ft_lib);
     }
-    my::Font *add_font(const char *path) override {
+
+    my::Font *get_font(const std::string &name) override {
+        auto it =
+            std::find_if(this->_fonts.cbegin(), this->_fonts.cend(),
+                         [&name](const font_map::value_type &v) {
+                             return !my::fs::path(v.first).stem().compare(name);
+                         });
+        if (it == this->_fonts.end()) {
+            throw std::runtime_error("font is not exist");
+        } else {
+            return it->second.get();
+        }
+    };
+
+    my::Font *add_font(const std::string &path) override {
+        auto it = this->_fonts.find(path);
+        if (it != this->_fonts.end()) {
+            return it->second.get();
+        }
         auto font = std::make_unique<MyFont>(this->_ft_lib, path);
         auto ptr = font.get();
-        fonts.insert(std::move(font));
+        this->_fonts.insert({path, std::move(font)});
         return ptr;
     }
 
   private:
     FT_Library _ft_lib;
-
-    std::set<std::unique_ptr<my::Font>> fonts;
+    typedef std::map<std::string, std::unique_ptr<my::Font>> font_map;
+    font_map _fonts;
 };
 } // namespace
 namespace my {

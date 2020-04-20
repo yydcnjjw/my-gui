@@ -98,11 +98,11 @@ void Logger::_addLogOutputTarget(unsigned long offset,
 }
 
 void Logger::close() {
-    std::unique_lock<std::mutex> local_lock(this->_lock);
+    std::unique_lock<std::mutex> l_lock(this->_lock);
     this->_log_source.get_subscriber().on_completed();
     this->_log_source.get_subscriber().unsubscribe();
     this->_cv.notify_all();
-    local_lock.unlock();
+    l_lock.unlock();
     if (this->_log_thread.joinable()) {
         this->_log_thread.join();
     }

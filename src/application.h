@@ -24,6 +24,7 @@ class Application {
     virtual AsyncTask *async_task() const = 0;
     virtual ResourceMgr *resource_mgr() const = 0;
     virtual AudioMgr *audio_mgr() const = 0;
+    virtual LLGL::RenderSystem *renderer() const = 0;
     virtual bool
     get_program_option(const std::string &option,
                        program_options::variable_value &value) const = 0;

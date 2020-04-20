@@ -44,8 +44,8 @@ class Font {
 class FontMgr {
   public:
     virtual ~FontMgr() = default;
-    virtual Font *add_font(const char *path) = 0;
-
+    virtual Font *get_font(const std::string &name) = 0;
+    virtual Font *add_font(const std::string &path) = 0;
     static std::unique_ptr<FontMgr> create();
 
   protected:

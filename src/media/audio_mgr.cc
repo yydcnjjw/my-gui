@@ -34,6 +34,7 @@ class SDLAudioMgr : public my::AudioMgr {
 
         audio->channel = channel;
     }
+
     void pause(my::Audio *audio) override {
         if (audio->channel == -1) {
             return;
@@ -41,19 +42,52 @@ class SDLAudioMgr : public my::AudioMgr {
         ::Mix_Pause(audio->channel);
     }
 
+    bool is_paused(my::Audio *audio) override {
+        if (audio->channel == -1) {
+            GLOG_W("audio is not bind channel");
+            return true;
+        }
+        return ::Mix_Paused(audio->channel);
+    }
+
+    void resume(my::Audio *audio) override {
+        if (audio->channel == -1) {
+            GLOG_W("audio is not bind channel");
+            return;
+        }
+        ::Mix_Resume(audio->channel);
+    }
+
     void play_fade(my::Audio *audio, int ms) override {
         int channel;
         if ((channel = ::Mix_FadeInChannel(-1, audio->sample, 0, ms)) == -1) {
-            throw std::runtime_error(Mix_GetError());
+            throw std::runtime_error(::Mix_GetError());
         }
 
         audio->channel = channel;
     }
-    void pause_fade(my::Audio *audio, int ms) override {
+
+    virtual void stop(my::Audio *audio) override {
+        if (audio->channel == -1) {
+            return;
+        }
+        ::Mix_HaltChannel(audio->channel);
+    }
+
+    void stop_fade(my::Audio *audio, int ms) override {
         if (audio->channel == -1) {
             return;
         }
         ::Mix_FadeOutChannel(audio->channel, ms);
+    }
+
+    void set_panning(my::Audio *audio, uint8_t left, uint8_t right) override {
+        if (audio->channel == -1) {
+            return;
+        }
+        if (!::Mix_SetPanning(audio->channel, left, right)) {
+            throw std::runtime_error(::Mix_GetError());
+        }
     }
 };
 } // namespace
