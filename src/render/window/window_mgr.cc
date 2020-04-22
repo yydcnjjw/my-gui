@@ -221,18 +221,21 @@ class SDLWindowMgr : public my::WindowMgr {
         SDL_Window *sdl_win = SDL_CreateWindow(
             title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w,
             h,
-            SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI);
+            SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI |
+                SDL_WINDOW_RESIZABLE);
 
         if (sdl_win == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
         auto win = std::make_unique<SDLWindow>(sdl_win);
         auto id = win->get_window_id();
+        GLOG_D("----------create window %d %s", id, title.c_str());
         this->_windows[id] = std::move(win);
         return this->_windows.at(id).get();
     }
 
     void remove_window(my::Window *win) override {
+        GLOG_D("----------remove window %d", win->get_window_id());
         this->_windows.erase(win->get_window_id());
     }
 

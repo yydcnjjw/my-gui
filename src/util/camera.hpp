@@ -6,9 +6,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "event_bus.hpp"
-#include "logger.h"
-#include "window_mgr.h"
+#include <util/event_bus.hpp>
+#include <util/logger.h>
+#include <render/window/window_mgr.h>
 
 namespace my {
 constexpr float SENSITIVITY = 0.1f;

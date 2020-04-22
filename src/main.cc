@@ -9,8 +9,10 @@
 
 // #include <util/logger.h>
 
-#include <stdexcept>
 #include <iostream>
+#include <stdexcept>
+
+#include <rx.hpp>
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -38,20 +40,40 @@ int main(int, char *[]) {
     // my::Canvas canvas(renderer.get(), win, resource_mgr.get(),
     // font_mgr.get());
 
-    auto url =
-        "/home/yydcnjjw/workspace/code/project/my-gui/assets/media/01.mp4";
-    AVFormatContext *fmt_ctx{};
-    int code{};
-    if ((code = ::avformat_open_input(&fmt_ctx, url, nullptr, nullptr))) {
-        throw std::runtime_error(av_err2str(code));
-    }
+    // auto url =
+    //     "/home/yydcnjjw/workspace/code/project/my-gui/assets/media/01.mp4";
+    // AVFormatContext *fmt_ctx{};
+    // int code{};
+    // if ((code = ::avformat_open_input(&fmt_ctx, url, nullptr, nullptr))) {
+    //     throw std::runtime_error(av_err2str(code));
+    // }
 
-    if ((code = ::avformat_find_stream_info(fmt_ctx, nullptr))) {
-        throw std::runtime_error(av_err2str(code));
-    }
-    std::cout << fmt_ctx->nb_streams << std::endl;
+    // if ((code = ::avformat_find_stream_info(fmt_ctx, nullptr))) {
+    //     throw std::runtime_error(av_err2str(code));
+    // }
+    // std::cout << fmt_ctx->nb_streams << std::endl;
 
-    ::av_dump_format(fmt_ctx, 0, url, 0);
+    // ::av_dump_format(fmt_ctx, 0, url, 0);
+
     // Logger::get()->close();
+
+    auto thread = rxcpp::serialize_new_thread();
+    rxcpp::subjects::subject<int> s;
+    rxcpp::observable<>::interval(std::chrono::seconds(1), thread)
+        .subscribe([&](long i) { s.get_subscriber().on_next(i); });
+    rxcpp::composite_subscription cs;
+    cs = s.get_observable().subscribe(
+        [&cs](int i) {
+            std::cout << "1: " << i << std::endl;
+            if (i == 3) {
+                cs.unsubscribe();
+            }
+        });
+    auto cs1 = s.get_observable().subscribe(
+        [](int i) {
+            std::cout << "2: " << i << std::endl;
+        });
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     return 0;
 }

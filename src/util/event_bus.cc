@@ -18,11 +18,15 @@ void EventBus::run() {
                this->_rlp.peek().when < this->_rlp.now()) {
             this->_rlp.dispatch();
         }
+        this->post<IdleEvent>();
+        while (!this->_rlp.empty() &&
+               this->_rlp.peek().when < this->_rlp.now()) {
+            this->_rlp.dispatch();
+        }
         if (this->_event_suject.get_subscriber().is_subscribed() ||
             !this->_rlp.empty()) {
-            // GLOG_D("event loop is blocking ...");
-            std::unique_lock<std::mutex> local_lock(this->_lock);
-            this->_cv.wait(local_lock, [this] {
+            std::unique_lock<std::mutex> l_lock(this->_lock);
+            this->_cv.wait(l_lock, [this] {
                 return !this->_rlp.empty() &&
                        this->_rlp.peek().when < this->_rlp.now();
             });

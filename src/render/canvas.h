@@ -9,6 +9,7 @@
 #include <render/window/window_mgr.h>
 #include <storage/font_mgr.h>
 #include <storage/resource_mgr.hpp>
+#include <util/event_bus.hpp>
 #include <util/logger.h>
 
 namespace my {
@@ -63,7 +64,7 @@ struct DrawCmd {
 
 class Canvas {
   public:
-    Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
+    Canvas(RenderSystem *renderer, Window *win, EventBus *bus, ResourceMgr *resource_mgr,
            FontMgr *font_mgr);
     ~Canvas();
 
@@ -151,38 +152,48 @@ class Canvas {
     }
 
   private:
-    RenderSystem *_renderer;
-    LLGL::RenderContext *_context;
-    LLGL::PipelineState *_pipeline;
-    LLGL::PipelineLayout *_pipeline_layout;
-    LLGL::CommandQueue *_queue;
-    LLGL::CommandBuffer *_commands;
+    RenderSystem *_renderer{};
+    LLGL::RenderContext *_context{};
+    LLGL::ShaderProgram *_shader{};
+    std::array<LLGL::PipelineState *, 2> _pipeline{};
+    LLGL::PipelineLayout *_pipeline_layout{};
+    LLGL::CommandQueue *_queue{};
+    LLGL::CommandBuffer *_commands{};
 
     LLGL::VertexFormat _vertex_format;
     std::vector<DrawVert> _vtx_list;
     std::vector<uint32_t> _idx_list;
-    LLGL::Buffer *_vtx_buf = nullptr;
-    LLGL::Buffer *_idx_buf = nullptr;
-    LLGL::ResourceHeap *_default_resource;
+    LLGL::Buffer *_vtx_buf{};
+    LLGL::Buffer *_idx_buf{};
+    LLGL::ResourceHeap *_default_resource{};
 
-    LLGL::Sampler *_sampler;
+    LLGL::Sampler *_sampler{};
 
-    my::Font *_default_font;
-    LLGL::Texture *_font_tex;
+    my::Font *_default_font{};
+    LLGL::Texture *_font_tex{};
     struct ConstBlock {
         glm::vec2 scale;
         glm::vec2 translate;
     };
 
     ConstBlock _const_block;
-    LLGL::Buffer *_constant;
+    LLGL::Buffer *_constant{};
 
     struct Texture {
-        LLGL::Texture *texture;
-        LLGL::ResourceHeap *resource;
+        LLGL::Texture *texture{};
+        LLGL::ResourceHeap *resource{};
+        void release(LLGL::RenderSystem *renderer) {
+            renderer->Release(*this->resource);
+            renderer->Release(*this->texture);
+        }
     };
     std::unordered_map<std::string, Texture> _textures;
-    LLGL::Fence *_fence;
+
+    Texture _canvas_tex;
+    LLGL::Buffer *_canvas_vtx{};
+    LLGL::Buffer *_canvas_idx{};
+    LLGL::Extent2D _canvas_tex_size;
+    LLGL::RenderTarget *_render_target;
 
     // first cmd
     std::vector<DrawCmd> _cmd_list;
@@ -194,6 +205,13 @@ class Canvas {
     uint32_t _vtx_offset = 0;
 
     std::shared_mutex _lock;
+
+    my::Window *_window;
+    my::Size2D _size;
+
+    void _make_context_resource();
+    void _release_context_resource();
+    void _resize_handle();
 
     DrawState &_get_state() {
         std::shared_lock<std::shared_mutex> l_lock(this->_lock);

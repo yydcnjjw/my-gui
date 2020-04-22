@@ -68,6 +68,10 @@ struct Size2D {
     u_int32_t h;
     Size2D() : Size2D(0, 0) {}
     Size2D(u_int32_t w, u_int32_t h) : w(w), h(h) {}
+
+    bool operator==(Size2D &size) {
+        return this->w == size.w && this->h == size.h;
+    }
 };
 
 class Window {

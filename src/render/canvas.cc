@@ -26,11 +26,9 @@ DrawPath &DrawPath::rect(const glm::vec2 &a, const glm::vec2 &c) {
     return *this;
 }
 
-Canvas::Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
-               FontMgr *font_mgr)
-    : _renderer(renderer) {
-
-    auto win_size = win->get_size();
+Canvas::Canvas(RenderSystem *renderer, Window *win, EventBus *bus,
+               ResourceMgr *resource_mgr, FontMgr *font_mgr)
+    : _renderer(renderer), _window(win) {
     {
         this->_vertex_format.AppendAttribute({"pos", LLGL::Format::RG32Float});
         this->_vertex_format.AppendAttribute({"uv", LLGL::Format::RG32Float});
@@ -40,16 +38,6 @@ Canvas::Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
     }
 
     {
-        LLGL::RenderContextDescriptor context_desc;
-        context_desc.videoMode.resolution = {win_size.w, win_size.h};
-        context_desc.vsync.enabled = true;
-
-        this->_context =
-            renderer->CreateRenderContext(context_desc, win->get_surface());
-    }
-
-    {
-        LLGL::ShaderProgram *shader_program = nullptr;
         auto vert =
             resource_mgr
                 ->load_from_path<my::Blob>(
@@ -96,69 +84,60 @@ Canvas::Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
             shader_program_desc.vertexShader = vert_shader;
             shader_program_desc.fragmentShader = frag_shader;
         }
-        shader_program = renderer->CreateShaderProgram(shader_program_desc);
+        this->_shader = renderer->CreateShaderProgram(shader_program_desc);
 
         // Link shader program and check for errors
-        if (shader_program->HasErrors())
-            throw std::runtime_error(shader_program->GetReport());
+        if (this->_shader->HasErrors())
+            throw std::runtime_error(this->_shader->GetReport());
+    }
+    {
+        LLGL::PipelineLayoutDescriptor layout_desc{
+            {LLGL::BindingDescriptor{LLGL::ResourceType::Buffer,
+                                     LLGL::BindFlags::ConstantBuffer,
+                                     LLGL::StageFlags::VertexStage, 0},
+             LLGL::BindingDescriptor{LLGL::ResourceType::Texture,
+                                     LLGL::BindFlags::Sampled,
+                                     LLGL::StageFlags::FragmentStage, 1},
+             LLGL::BindingDescriptor{LLGL::ResourceType::Sampler, 0,
+                                     LLGL::StageFlags::FragmentStage, 2}}};
 
+        this->_pipeline_layout = renderer->CreatePipelineLayout(layout_desc);
+    }
+
+    {
+        auto win_size = this->_window->get_size();
+        this->_const_block.scale =
+            glm::vec2(2.0f / win_size.w, 2.0f / win_size.h);
+        this->_const_block.translate = glm::vec2(-1.0f);
+        this->_constant = this->_renderer->CreateBuffer(
+            LLGL::ConstantBufferDesc(sizeof(ConstBlock)), &this->_const_block);
+    }
+
+    {
+
+        this->_default_font = font_mgr->add_font(
+            "/home/yydcnjjw/workspace/code/project/my-gui/assets/fonts/"
+            "NotoSansCJK-Regular.ttc");
+        int w, h;
+        auto font_tex = this->_default_font->get_tex_as_rgb32(&w, &h);
+        LLGL::SrcImageDescriptor src_image_desc{LLGL::ImageFormat::RGBA,
+                                                LLGL::DataType::UInt8, font_tex,
+                                                (uint32_t)w * h * 4};
+        this->_font_tex = this->_renderer->CreateTexture(
+            LLGL::Texture2DDesc(LLGL::Format::RGBA8UNorm, w, h),
+            &src_image_desc);
+
+        this->_sampler = this->_renderer->CreateSampler({});
+
+        LLGL::ResourceHeapDescriptor resource_heap_desc;
         {
-            LLGL::PipelineLayoutDescriptor layout_desc{
-                {LLGL::BindingDescriptor{LLGL::ResourceType::Buffer,
-                                         LLGL::BindFlags::ConstantBuffer,
-                                         LLGL::StageFlags::VertexStage, 0},
-                 LLGL::BindingDescriptor{LLGL::ResourceType::Texture,
-                                         LLGL::BindFlags::Sampled,
-                                         LLGL::StageFlags::FragmentStage, 1},
-                 LLGL::BindingDescriptor{LLGL::ResourceType::Sampler, 0,
-                                         LLGL::StageFlags::FragmentStage, 2}}};
-
-            this->_pipeline_layout =
-                renderer->CreatePipelineLayout(layout_desc);
+            resource_heap_desc.pipelineLayout = this->_pipeline_layout;
+            resource_heap_desc.resourceViews = {
+                this->_constant, this->_font_tex, this->_sampler};
         }
 
-        {
-            this->_const_block.scale =
-                glm::vec2(2.0f / win_size.w, 2.0f / win_size.h);
-            this->_const_block.translate = glm::vec2(-1.0f);
-            this->_constant = renderer->CreateBuffer(
-                LLGL::ConstantBufferDesc(sizeof(ConstBlock)),
-                &this->_const_block);
-
-            this->_default_font = font_mgr->add_font(
-                "/home/yydcnjjw/workspace/code/project/my-gui/assets/fonts/"
-                "NotoSansCJK-Regular.ttc");
-            int w, h;
-            auto font_tex = this->_default_font->get_tex_as_rgb32(&w, &h);
-            LLGL::SrcImageDescriptor src_image_desc{
-                LLGL::ImageFormat::RGBA, LLGL::DataType::UInt8, font_tex,
-                (uint32_t)w * h * 4};
-            this->_font_tex = this->_renderer->CreateTexture(
-                LLGL::Texture2DDesc(LLGL::Format::RGBA8UNorm, w, h),
-                &src_image_desc);
-
-            this->_sampler = this->_renderer->CreateSampler({});
-
-            LLGL::ResourceHeapDescriptor resource_heap_desc;
-            {
-                resource_heap_desc.pipelineLayout = this->_pipeline_layout;
-                resource_heap_desc.resourceViews = {
-                    this->_constant, this->_font_tex, this->_sampler};
-            }
-
-            this->_default_resource =
-                renderer->CreateResourceHeap(resource_heap_desc);
-        }
-
-        LLGL::GraphicsPipelineDescriptor pipeline_desc;
-        {
-            pipeline_desc.shaderProgram = shader_program;
-            pipeline_desc.pipelineLayout = this->_pipeline_layout;
-            pipeline_desc.rasterizer.cullMode = LLGL::CullMode::Back;
-            pipeline_desc.blend.targets[0] = {true};
-        }
-
-        this->_pipeline = renderer->CreatePipelineState(pipeline_desc);
+        this->_default_resource =
+            renderer->CreateResourceHeap(resource_heap_desc);
     }
 
     {
@@ -166,7 +145,7 @@ Canvas::Canvas(RenderSystem *renderer, Window *win, ResourceMgr *resource_mgr,
         this->_commands = renderer->CreateCommandBuffer();
     }
 
-    { this->_fence = renderer->CreateFence(); }
+    this->_make_context_resource();
 }
 
 Canvas::~Canvas() {
@@ -178,6 +157,106 @@ Canvas::~Canvas() {
     // this->_renderer->Release(*this->_context);
 
     // TODO: release textures
+}
+
+void Canvas::_make_context_resource() {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+    {
+        auto win_size = this->_window->get_size();
+        GLOG_D("make context win size %d,%d", win_size.w, win_size.h);
+        this->_size = win_size;
+        {
+            LLGL::RenderContextDescriptor context_desc;
+            context_desc.videoMode.resolution = {win_size.w, win_size.h};
+            // context_desc.vsync.enabled = true;
+
+            this->_context = this->_renderer->CreateRenderContext(
+                context_desc, this->_window->get_surface());
+        }
+
+        {
+            this->_canvas_tex_size = {win_size.w, win_size.h};
+            this->_canvas_tex.texture =
+                this->_renderer->CreateTexture(LLGL::Texture2DDesc(
+                    LLGL::Format::RGBA8UNorm, this->_canvas_tex_size.width,
+                    this->_canvas_tex_size.height));
+            LLGL::ResourceHeapDescriptor resource_heap_desc;
+            {
+                resource_heap_desc.pipelineLayout = this->_pipeline_layout;
+                resource_heap_desc.resourceViews = {
+                    this->_constant, this->_canvas_tex.texture, this->_sampler};
+            }
+
+            this->_canvas_tex.resource =
+                this->_renderer->CreateResourceHeap(resource_heap_desc);
+
+            LLGL::RenderTargetDescriptor desc;
+            desc.resolution = this->_canvas_tex_size;
+            desc.attachments = {LLGL::AttachmentDescriptor{
+                LLGL::AttachmentType::Color, this->_canvas_tex.texture}};
+            this->_render_target = this->_renderer->CreateRenderTarget(desc);
+            std::vector<DrawVert> canvas_vtx{
+                {{0, 0}, {0, 0}},
+                {{win_size.w, 0}, {1, 0}},
+                {{win_size.w, win_size.h}, {1, 1}},
+                {{0, win_size.h}, {0, 1}}};
+            std::vector<uint32_t> canvas_idx{0, 1, 2, 0, 2, 3};
+
+            this->_canvas_vtx = this->_renderer->CreateBuffer(
+                LLGL::VertexBufferDesc(canvas_vtx.size() * sizeof(DrawVert),
+                                       this->_vertex_format),
+                canvas_vtx.data());
+            this->_canvas_idx = this->_renderer->CreateBuffer(
+                LLGL::IndexBufferDesc(canvas_idx.size() * sizeof(uint32_t),
+                                      LLGL ::Format::R32UInt),
+                canvas_idx.data());
+        }
+
+        {
+
+            LLGL::GraphicsPipelineDescriptor pipeline_desc;
+            {
+                pipeline_desc.shaderProgram = this->_shader;
+                pipeline_desc.renderPass =
+                    this->_render_target->GetRenderPass();
+                pipeline_desc.pipelineLayout = this->_pipeline_layout;
+                pipeline_desc.rasterizer.cullMode = LLGL::CullMode::Back;
+                pipeline_desc.blend.targets[0] = {true};
+            }
+
+            this->_pipeline[0] =
+                this->_renderer->CreatePipelineState(pipeline_desc);
+
+            pipeline_desc.renderPass = this->_context->GetRenderPass();
+
+            this->_pipeline[1] =
+                this->_renderer->CreatePipelineState(pipeline_desc);
+        }
+    }
+}
+
+void Canvas::_release_context_resource() {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+    this->_canvas_tex.release(this->_renderer);
+    this->_renderer->Release(*this->_canvas_vtx);
+    this->_renderer->Release(*this->_canvas_idx);
+
+    this->_renderer->Release(*this->_pipeline[0]);
+    this->_renderer->Release(*this->_pipeline[1]);
+    this->_renderer->Release(*this->_render_target);
+    this->_renderer->Release(*this->_context);
+}
+
+void Canvas::_resize_handle() {
+    auto win_size = this->_window->get_size();
+    if (win_size == this->_size) {
+        return;
+    }
+    GLOG_D("resize %d, %d --------------------------------------------",
+           win_size.w, win_size.h);
+    this->_queue->WaitIdle();
+    this->_release_context_resource();
+    this->_make_context_resource();
 }
 
 Canvas &Canvas::draw_image(std::shared_ptr<Image> image, const glm::vec2 &p_min,
@@ -241,7 +320,6 @@ Canvas &Canvas::fill_text(const std::string &text, const glm::vec2 &p,
         p_min.y = pos.y - (h - glyph.h * scale) - h;
         p_max.x = p_min.x + w;
         p_max.y = p_min.y + h;
-        this->stroke_rect(p_min, p_max, {255, 0, 0, 255}, 1);
         this->_prim_rect_uv(p_min, p_max, glyph.uv0, glyph.uv1, color);
         pos.x += glyph.advance_x * scale;
     }
@@ -393,14 +471,18 @@ void Canvas::_add_convex_poly_fill(const DrawPath &path,
 }
 
 void Canvas::render() {
-    auto &draw_cmd = this->get_draw_cmd();
-    {
-        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+    { this->_resize_handle(); }
 
+    {
+        std::shared_lock<std::shared_mutex> l_lock(this->_lock);
         if (this->_vtx_list.empty() && this->_idx_list.empty()) {
             return;
         }
+    }
 
+    {
+        auto &draw_cmd = this->get_draw_cmd();
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
         this->_queue->WaitIdle();
         if (this->_vtx_buf) {
             this->_renderer->Release(*this->_vtx_buf);
@@ -422,18 +504,28 @@ void Canvas::render() {
 
         this->_commands->Begin();
         {
-            // Set viewport and scissor rectangle
-            this->_commands->SetViewport(this->_context->GetResolution());
-
-            this->_commands->SetPipelineState(*this->_pipeline);
-
-            // Set vertex buffer
-            this->_commands->SetVertexBuffer(*this->_vtx_buf);
-            this->_commands->SetIndexBuffer(*this->_idx_buf);
-
-            this->_commands->BeginRenderPass(*this->_context);
             {
-                // this->_commands->Clear(LLGL::ClearFlags::Color);
+                auto win_size = this->_window->get_size();
+                this->_const_block.scale =
+                    glm::vec2(2.0f / win_size.w, 2.0f / win_size.h);
+                this->_commands->UpdateBuffer(*this->_constant, 0,
+                                              &this->_const_block,
+                                              sizeof(ConstBlock));
+                auto _resolution = this->_render_target->GetResolution();
+                auto resolution = this->_context->GetResolution();
+                GLOG_D("update buffer win size %d,%d", win_size.w, win_size.h);
+                GLOG_D("resolution size %d,%d", resolution.width,
+                       resolution.height);
+                GLOG_D("target resolution size %d,%d", _resolution.width,
+                       _resolution.height);
+            }
+
+            this->_commands->SetViewport(this->_render_target->GetResolution());
+            this->_commands->BeginRenderPass(*this->_render_target);
+            {
+                this->_commands->SetPipelineState(*this->_pipeline[0]);
+                this->_commands->SetVertexBuffer(*this->_vtx_buf);
+                this->_commands->SetIndexBuffer(*this->_idx_buf);
                 for (const auto &cmd : draw_cmd) {
                     if (cmd.state.image) {
                         auto texture =
@@ -451,12 +543,30 @@ void Canvas::render() {
                 }
             }
             this->_commands->EndRenderPass();
+            this->_commands->SetViewport(this->_context->GetResolution());
+            this->_commands->BeginRenderPass(*this->_context);
+            {
+                this->_commands->SetPipelineState(*this->_pipeline[1]);
+                this->_commands->SetVertexBuffer(*this->_canvas_vtx);
+                this->_commands->SetIndexBuffer(*this->_canvas_idx);
+                this->_commands->SetViewport(this->_context->GetResolution());
+                this->_commands->SetResourceHeap(*this->_canvas_tex.resource);
+                this->_commands->DrawIndexed(6, 0);
+            }
+            this->_commands->EndRenderPass();
         }
         this->_commands->End();
 
         this->_queue->Submit(*this->_commands);
 
-        this->_context->Present();
+        try {
+            this->_context->Present();
+        } catch (std::exception &e) {
+            GLOG_D(e.what());
+            l_lock.unlock();
+            this->_resize_handle();
+            return;
+        }
     }
     this->clear();
 }
