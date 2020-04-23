@@ -29,7 +29,8 @@ find_package(Threads REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2Mixer REQUIRED)
-find_package(Boost REQUIRED COMPONENTS thread program_options iostreams locale timer)
+find_package(Boost REQUIRED COMPONENTS
+  thread program_options iostreams locale timer coroutine)
 find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
@@ -48,7 +49,8 @@ set(DEPS
   Boost::program_options
   Boost::iostreams
   Boost::locale
-  Boost::timer  
+  Boost::timer
+  Boost::coroutine
   ${FFMPEG_LIBRARIES}
   Freetype::Freetype
   Vulkan::Vulkan

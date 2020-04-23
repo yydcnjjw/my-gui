@@ -40,7 +40,6 @@ template <typename T> class Event : public IEvent {
 };
 
 struct QuitEvent {};
-struct IdleEvent {};
 class EventBus {
   public:
     EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {}

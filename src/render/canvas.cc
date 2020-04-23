@@ -195,11 +195,10 @@ void Canvas::_make_context_resource() {
             desc.attachments = {LLGL::AttachmentDescriptor{
                 LLGL::AttachmentType::Color, this->_canvas_tex.texture}};
             this->_render_target = this->_renderer->CreateRenderTarget(desc);
-            std::vector<DrawVert> canvas_vtx{
-                {{0, 0}, {0, 0}},
-                {{win_size.w, 0}, {1, 0}},
-                {{win_size.w, win_size.h}, {1, 1}},
-                {{0, win_size.h}, {0, 1}}};
+            std::vector<DrawVert> canvas_vtx{{{0, 0}, {0, 0}},
+                                             {{win_size.w, 0}, {1, 0}},
+                                             {{win_size.w, win_size.h}, {1, 1}},
+                                             {{0, win_size.h}, {0, 1}}};
             std::vector<uint32_t> canvas_idx{0, 1, 2, 0, 2, 3};
 
             this->_canvas_vtx = this->_renderer->CreateBuffer(
@@ -511,13 +510,6 @@ void Canvas::render() {
                 this->_commands->UpdateBuffer(*this->_constant, 0,
                                               &this->_const_block,
                                               sizeof(ConstBlock));
-                auto _resolution = this->_render_target->GetResolution();
-                auto resolution = this->_context->GetResolution();
-                GLOG_D("update buffer win size %d,%d", win_size.w, win_size.h);
-                GLOG_D("resolution size %d,%d", resolution.width,
-                       resolution.height);
-                GLOG_D("target resolution size %d,%d", _resolution.width,
-                       _resolution.height);
             }
 
             this->_commands->SetViewport(this->_render_target->GetResolution());

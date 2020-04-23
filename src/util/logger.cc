@@ -36,14 +36,14 @@ Logger::Logger() : _buf(4096, 0) {
                 while (!rlp.empty() && rlp.peek().when < rlp.now()) {
                     rlp.dispatch();
                 }
-                if (this->_log_source.get_subscriber().is_subscribed() ||
-                    !rlp.empty()) {
+                if (!this->_log_source.get_subscriber().is_subscribed()) {
+                    break;
+                }
+                if (rlp.empty()) {
                     std::unique_lock<std::mutex> local_lock(this->_lock);
                     this->_cv.wait(local_lock, [&rlp] {
                         return !rlp.empty() && rlp.peek().when < rlp.now();
                     });
-                } else {
-                    break;
                 }
             }
         },
