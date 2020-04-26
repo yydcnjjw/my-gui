@@ -32,7 +32,7 @@ using async_callback = std::function<void(std::shared_ptr<promise<T>>)>;
 
 class AsyncTask {
   public:
-    AsyncTask() : _pool(4) {}
+    AsyncTask() : _pool(2) {}
     ~AsyncTask() {
         this->_pool.stop();
         this->_pool.join();
@@ -68,9 +68,7 @@ class AsyncTask {
                 on_timer, boost::asio::placeholders::error, this));
         }
 
-        bool is_cancel() {
-            return this->_cancel;
-        }
+        bool is_cancel() { return this->_cancel; }
 
         void cancel() {
             if (this->_cancel) {
@@ -79,6 +77,7 @@ class AsyncTask {
             this->_cancel = true;
             this->_timer.cancel();
         }
+        void wait() { this->_timer.wait(); }
 
       private:
         boost::asio::steady_timer _timer;
@@ -104,6 +103,18 @@ class AsyncTask {
                           const std::chrono::milliseconds &interval) {
         return std::make_shared<Timer<Callback>>(
             this->_pool, std::forward<Callback>(callback), interval);
+    }
+
+    template <typename Callback,
+              typename = std::enable_if_t<std::is_invocable<
+                  Callback, boost::system::error_code &,
+                  std::shared_ptr<boost::asio::steady_timer>>::value>>
+    void do_timer_for(Callback &&callback,
+                      const std::chrono::milliseconds &time) {
+        auto timer =
+            std::make_shared<boost::asio::steady_timer>(this->_pool, time);
+        timer->async_wait(boost::bind<void>(
+            callback, boost::asio::placeholders::error, timer));
     }
 
     static std::unique_ptr<AsyncTask> create();

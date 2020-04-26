@@ -45,18 +45,22 @@ class Image : public Resource {
   public:
     explicit Image(const fs::path &path);
     Image(const fs::path &path, std::shared_ptr<std::istream> is);
-
-    [[nodiscard]] size_t width() const { return this->_image.width(); }
-    [[nodiscard]] size_t height() const { return this->_image.height(); }
-    u_char *raw_data() {
-        return boost::gil::interleaved_view_get_raw_data(
-            boost::gil::view(this->_image));
+    Image(const uint8_t *data, int w, int h);
+    
+    [[nodiscard]] size_t width() const { return this->_w; }
+    [[nodiscard]] size_t height() const { return this->_h; }
+    const uint8_t *raw_data() const {
+        return this->_data;
     }
 
   private:
     void _load_from_stream(const fs::path &path,
                            std::shared_ptr<std::istream> is);
+    
     boost::gil::rgba8_image_t _image;
+    const uint8_t *_data;
+    int _w;
+    int _h;
 };
 
 class TJS2Script : public Resource {

@@ -18,8 +18,7 @@ class PosixApplication : public my::Application {
         // XXX:
         pthread_setname_np(pthread_self(), "main");
         LLGL::Log::SetReportCallbackStd();
-        this->_parse_program_options(argc, argv, opts_desc);
-        
+        this->_parse_program_options(argc, argv, opts_desc);        
     }
 
     ~PosixApplication() override {}

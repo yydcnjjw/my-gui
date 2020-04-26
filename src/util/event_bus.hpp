@@ -24,16 +24,16 @@ template <typename T> class Event : public IEvent {
     Event(std::shared_ptr<T> t) : IEvent(typeid(T).hash_code()), data(t) {}
 
     template <typename... Args>
-    static auto make(std::shared_ptr<T> data) -> decltype(auto) {
+    static decltype(auto) make(std::shared_ptr<T> data) {
         return std::make_shared<Event<T>>(data);
     }
 
     template <typename... Args>
-    static auto make(Args &&... args) -> decltype(auto) {
+    static decltype(auto) make(Args &&... args) {
         return make(std::make_shared<T>(std::forward<Args>(args)...));
     }
 
-    static auto make(T &&t) -> decltype(auto) {
+    static decltype(auto) make(T &&t) {
         return make(std::make_shared<T>(std::forward(t)));
     }
     std::shared_ptr<T> data;
@@ -43,7 +43,7 @@ struct QuitEvent {};
 class EventBus {
   public:
     EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {}
-    template <typename T> auto on_event() -> decltype(auto) {
+    template <typename T> decltype(auto) on_event() {
         std::unique_lock<std::mutex> l_lock(this->_lock);
         return this->_event_suject.get_observable()
             .filter([](const std::shared_ptr<IEvent> &e) {

@@ -150,7 +150,7 @@ class SDLWindowMgr : public my::WindowMgr {
 
   public:
     SDLWindowMgr(my::EventBus *bus) {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
 
@@ -210,6 +210,9 @@ class SDLWindowMgr : public my::WindowMgr {
     }
 
     ~SDLWindowMgr() {
+        if (!this->_is_exit) {
+            this->_is_exit = true;
+        }
         if (this->_win_mgr_thread.joinable()) {
             this->_win_mgr_thread.join();
         }
@@ -253,11 +256,15 @@ class SDLWindowMgr : public my::WindowMgr {
         return my::MouseState(mask, {x, y});
     }
 
+    bool has_window(my::WindowID id) override {
+        return this->_windows.find(id) != this->_windows.end();
+    }
+
   private:
     std::map<my::WindowID, std::unique_ptr<SDLWindow>> _windows;
     std::thread _win_mgr_thread;
     my::DisplayMode _desktop_display_mode;
-    bool _is_exit = false;
+    std::atomic_bool _is_exit = false;
     void _init_desktop_display_mode() {
         SDL_DisplayMode mode;
         if (SDL_GetDesktopDisplayMode(0, &mode) != 0) {

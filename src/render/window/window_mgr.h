@@ -157,6 +157,8 @@ class WindowMgr {
 
     virtual const DisplayMode &get_desktop_display_mode() = 0;
 
+    virtual bool has_window(WindowID id) = 0;
+    
     static std::unique_ptr<WindowMgr> create(EventBus *);
 
   protected:

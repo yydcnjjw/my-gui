@@ -11,7 +11,7 @@ execute_process(COMMAND ${CMAKE_COMMAND} --build .
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 set(gtest_dir ${DEPS_DIR}/lib64/cmake/GTest)
-if(EXISTS gtest_dir)
+if(EXISTS ${gtest_dir})
   set(GTest_DIR ${DEPS_DIR}/lib64/cmake/GTest CACHE INTERNAL "")  
 else()
   set(GTest_DIR ${DEPS_DIR}/lib/cmake/GTest CACHE INTERNAL "")  
@@ -64,7 +64,6 @@ execute_process(COMMAND ${CMAKE_COMMAND} --build .
 file(GLOB LLGL_lib ${DEPS_DIR}/LLGL/LLGL-build/build/*)
 set(LLGL_inc ${DEPS_DIR}/LLGL/LLGL-src/include CACHE INTERNAL "")
 set(LLGL_lib ${LLGL_lib} CACHE INTERNAL "")
-
 
 # list(APPEND CMAKE_MODULE_PATH ${DEPS_DIR}/LLGL/LLGL-src/cmake)
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} CACHE INTERNAL "" FORCE)

@@ -43,12 +43,9 @@ class DrawPath {
     std::vector<glm::vec2> _points;
 };
 #define _CHECK_CURRENT_PATH                                                    \
-    {                                                                          \
-        std::shared_lock<std::shared_mutex> l_lock(this->_lock);               \
-        if (!this->_current_path) {                                            \
-            GLOG_W("current path is reset");                                   \
-            return *this;                                                      \
-        }                                                                      \
+    if (!this->_current_path) {                                                \
+        GLOG_W("current path is reset");                                       \
+        return *this;                                                          \
     }
 
 struct DrawState {
@@ -64,8 +61,8 @@ struct DrawCmd {
 
 class Canvas {
   public:
-    Canvas(RenderSystem *renderer, Window *win, EventBus *bus, ResourceMgr *resource_mgr,
-           FontMgr *font_mgr);
+    Canvas(RenderSystem *renderer, Window *win, EventBus *bus,
+           ResourceMgr *resource_mgr, FontMgr *font_mgr);
     ~Canvas();
 
     Canvas &fill_rect(const glm::vec2 &a, const glm::vec2 &c,
@@ -86,46 +83,44 @@ class Canvas {
     }
 
     Canvas &line_to(const glm::vec2 &pos) {
-        _CHECK_CURRENT_PATH;
         std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+        _CHECK_CURRENT_PATH;
         this->_current_path->line_to(pos);
         return *this;
     }
 
     Canvas &rect(const glm::vec2 &a, const glm::vec2 &c) {
-        _CHECK_CURRENT_PATH;
         std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+        _CHECK_CURRENT_PATH;
         this->_current_path->rect(a, c);
         return *this;
     }
 
     Canvas &close_path() {
-        _CHECK_CURRENT_PATH;
-        this->line_to(this->_current_path->_points.front());
+        glm::vec2 pos;
+        {
+            std::shared_lock<std::shared_mutex> l_lock(this->_lock);
+            _CHECK_CURRENT_PATH;
+            pos = this->_current_path->_points.front();
+        }
+
+        this->line_to(pos);
         return *this;
     }
 
     Canvas &fill(const glm::u8vec4 &col) {
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
         _CHECK_CURRENT_PATH;
         this->_add_convex_poly_fill(*this->_current_path, col);
-
-        {
-            std::unique_lock<std::shared_mutex> l_lock(this->_lock);
-            this->_current_path.reset();
-        }
-
+        this->_current_path.reset();
         return *this;
     }
 
     Canvas &stroke(const ColorRGBAub &col, float line_width) {
-
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
         _CHECK_CURRENT_PATH;
-
         this->_add_poly_line(*this->_current_path, col, line_width);
-        {
-            std::unique_lock<std::shared_mutex> l_lock(this->_lock);
-            this->_current_path.reset();
-        }
+        this->_current_path.reset();
 
         return *this;
     }
@@ -149,6 +144,12 @@ class Canvas {
         this->_cmd_list.clear();
         this->_current_path.reset();
         this->_current_cmd = {};
+        
+        this->_queue->WaitIdle();
+        for (auto &tex : this->_textures) {
+            tex.second.release(this->_renderer);
+        }
+        this->_textures.clear();
     }
 
   private:
@@ -185,9 +186,11 @@ class Canvas {
         void release(LLGL::RenderSystem *renderer) {
             renderer->Release(*this->resource);
             renderer->Release(*this->texture);
+            this->resource = nullptr;
+            this->texture = nullptr;
         }
     };
-    std::unordered_map<std::string, Texture> _textures;
+    std::map<std::shared_ptr<Image>, Texture> _textures;
 
     Texture _canvas_tex;
     LLGL::Buffer *_canvas_vtx{};
@@ -213,12 +216,8 @@ class Canvas {
     void _release_context_resource();
     void _resize_handle();
 
-    DrawState &_get_state() {
-        std::shared_lock<std::shared_mutex> l_lock(this->_lock);
-        return this->_current_cmd.state;
-    }
+    DrawState &_get_state() { return this->_current_cmd.state; }
     void _set_state(const DrawState &state) {
-        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
         this->_current_cmd.state = state;
     }
 
