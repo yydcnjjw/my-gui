@@ -4,7 +4,6 @@
 #include <fstream>
 #include <locale>
 
-#include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
@@ -243,8 +242,7 @@ class XP3Archive : public my::Archive {
                     .str());
         }
 
-        auto it = this->_xp3_index.find(
-            boost::algorithm::to_lower_copy(path.string()));
+        auto it = this->_xp3_index.find(path.string());
         if (it == this->_xp3_index.end()) {
             throw std::runtime_error(
                 (boost::format("xp3 archive: %1% is not exist") % path).str());

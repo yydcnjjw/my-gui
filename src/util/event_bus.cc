@@ -21,7 +21,7 @@ void EventBus::run() {
         if (!this->_event_suject.get_subscriber().is_subscribed()) {
             break;
         }
-        if (this->_rlp.empty()) {
+        {
             std::unique_lock<std::mutex> l_lock(this->_lock);
             this->_cv.wait(l_lock, [this] {
                 return !this->_rlp.empty() &&

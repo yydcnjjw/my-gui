@@ -109,12 +109,13 @@ class AsyncTask {
               typename = std::enable_if_t<std::is_invocable<
                   Callback, boost::system::error_code &,
                   std::shared_ptr<boost::asio::steady_timer>>::value>>
-    void do_timer_for(Callback &&callback,
+    auto do_timer_for(Callback &&callback,
                       const std::chrono::milliseconds &time) {
         auto timer =
             std::make_shared<boost::asio::steady_timer>(this->_pool, time);
         timer->async_wait(boost::bind<void>(
             callback, boost::asio::placeholders::error, timer));
+        return timer;
     }
 
     static std::unique_ptr<AsyncTask> create();
