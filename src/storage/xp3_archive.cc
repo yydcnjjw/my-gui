@@ -176,18 +176,30 @@ class XP3Archive : public my::Archive {
         XP3Source(const my::fs::path &archive_path,
                   const std::shared_ptr<XP3ArchiveFileInfo> &file_info)
             : _archive_path(archive_path), _file_info(file_info) {
+
+            for (auto &segm : file_info->segms) {
+                GLOG_D("%d %d %d", segm.start, segm.org_size, segm.arc_size);
+            }
             this->_archive = std::make_shared<std::ifstream>();
             this->_archive->exceptions(std::ifstream::failbit |
                                        std::ifstream::badbit);
             this->_archive->open(archive_path, std::ios::binary);
 
             this->_current_segm = this->_file_info->segms.begin();
-            this->_archive->seekg(this->_current_segm->start);
+            init_current_segm();
+        }
 
+        void init_current_segm() {
+            if (this->_current_segm == this->_file_info->segms.end()) {
+                return;
+            }
+            this->_archive->seekg(this->_current_segm->start);
             this->_stream =
                 std::make_shared<boost::iostreams::filtering_istream>();
             this->_stream->exceptions(std::ifstream::failbit);
-            this->_stream->push(boost::iostreams::zlib_decompressor());
+            if (this->_current_segm->encode_method == EncodeMethod::ZLIB) {
+                this->_stream->push(boost::iostreams::zlib_decompressor());
+            }
             this->_stream->push(*this->_archive);
         }
 
@@ -207,6 +219,7 @@ class XP3Archive : public my::Archive {
                         this->_current_segm->org_size - this->_segm_readed;
                     this->_stream->read(s, size);
                     readed += size;
+                    s += size;
                     n -= size;
                 } else {
                     this->_segm_readed += n;
@@ -217,9 +230,8 @@ class XP3Archive : public my::Archive {
 
                 this->_segm_readed = 0;
                 ++this->_current_segm;
-                if (this->_current_segm != this->_file_info->segms.end()) {
-                    this->_archive->seekg(this->_current_segm->start);
-                } else {
+                init_current_segm();
+                if (this->_current_segm == this->_file_info->segms.end()) {
                     break;
                 }
             }

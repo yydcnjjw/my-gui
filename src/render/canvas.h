@@ -1,11 +1,11 @@
 #pragma once
 
-#include <glm/glm.hpp>
-
 #include <memory>
 #include <stack>
 #include <vector>
 
+#include <boost/gil.hpp>
+#include <glm/glm.hpp>
 #include <render/window/window_mgr.h>
 #include <storage/font_mgr.h>
 #include <storage/resource_mgr.hpp>
@@ -15,6 +15,7 @@
 namespace my {
 typedef LLGL::RenderSystem RenderSystem;
 typedef glm::u8vec4 ColorRGBAub;
+typedef boost::gil::rgba8_image_t RGBAImage;
 
 struct DrawVert {
     glm::vec2 pos;
@@ -133,7 +134,50 @@ class Canvas {
                       my::Font *font = nullptr, float font_size = 16,
                       const ColorRGBAub &color = {255, 255, 255, 255});
 
-    const std::vector<DrawCmd> &get_draw_cmd();
+    std::shared_ptr<RGBAImage> get_image_data(const PixelPos &offset,
+                                              const Size2D &size) {
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+
+        auto [canvas_w, canvas_h] = this->_canvas_tex->get_size();
+        uint32_t w{size.w}, h{size.h};
+        if (offset.x + size.w > canvas_w) {
+            w = canvas_w - offset.x;
+        }
+
+        if (offset.y + size.h > canvas_h) {
+            h = canvas_h - offset.y;
+        }
+
+        return this->_canvas_tex->get_image_data(offset.x, offset.y, w, h);
+    }
+
+    void put_image_data(std::shared_ptr<RGBAImage> data,
+                        const PixelPos &offset) {
+        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+        uint32_t src_w = data->width();
+        uint32_t src_h = data->height();
+        auto [canvas_w, canvas_h] = this->_canvas_tex->get_size();
+
+        uint32_t w{src_w}, h{src_h};
+        if (offset.x + src_w > canvas_w) {
+            w = canvas_w - offset.x;
+        }
+
+        if (offset.y + src_h > canvas_h) {
+            h = canvas_h - offset.y;
+        }
+
+        RGBAImage::const_view_t image_view{};
+
+        if (w != src_w && h != src_h) {
+            image_view = boost::gil::subimage_view(boost::gil::view(*data),
+                                                   {0, 0}, {w, h});
+        } else {
+            image_view = boost::gil::const_view(*data);
+        }
+
+        this->_canvas_tex->put_image_data(image_view, offset.x, offset.y);
+    }
 
     void render();
 
@@ -144,10 +188,9 @@ class Canvas {
         this->_cmd_list.clear();
         this->_current_path.reset();
         this->_current_cmd = {};
-        
-        this->_queue->WaitIdle();
+
         for (auto &tex : this->_textures) {
-            tex.second.release(this->_renderer);
+            tex.second.release();
         }
         this->_textures.clear();
     }
@@ -160,6 +203,7 @@ class Canvas {
     LLGL::PipelineLayout *_pipeline_layout{};
     LLGL::CommandQueue *_queue{};
     LLGL::CommandBuffer *_commands{};
+    LLGL::Fence *_fence;
 
     LLGL::VertexFormat _vertex_format;
     std::vector<DrawVert> _vtx_list;
@@ -180,22 +224,60 @@ class Canvas {
     ConstBlock _const_block;
     LLGL::Buffer *_constant{};
 
-    struct Texture {
+    class Texture {
+      public:
         LLGL::Texture *texture{};
         LLGL::ResourceHeap *resource{};
-        void release(LLGL::RenderSystem *renderer) {
-            renderer->Release(*this->resource);
-            renderer->Release(*this->texture);
+        LLGL::Extent2D get_size() {
+            auto extent = this->texture->GetDesc().extent;
+            return {extent.width, extent.height};
+        }
+
+        Texture(LLGL::Texture *texture, LLGL::ResourceHeap *resource,
+                RenderSystem *renderer)
+            : texture(texture), resource(resource), _renderer(renderer) {}
+        void release() {
+            this->_renderer->Release(*this->resource);
+            this->_renderer->Release(*this->texture);
             this->resource = nullptr;
             this->texture = nullptr;
         }
+
+        std::shared_ptr<RGBAImage> get_image_data(int32_t left, int32_t top,
+                                                  uint32_t w, uint32_t h) {
+            LLGL::TextureRegion region{{left, top, 0}, {w, h, 1}};
+
+            auto image = std::make_shared<RGBAImage>(w, h);
+            LLGL::DstImageDescriptor dst(
+                LLGL::ImageFormat::RGBA, LLGL::DataType::UInt8,
+                boost::gil::interleaved_view_get_raw_data(
+                    boost::gil::view(*image)),
+                w * h * sizeof(LLGL::ColorRGBAub));
+            this->_renderer->ReadTexture(*this->texture, region, dst);
+            return image;
+        }
+
+        void put_image_data(RGBAImage::const_view_t data, int32_t left,
+                            int32_t top) {
+            uint32_t w = data.width();
+            uint32_t h = data.height();
+            LLGL::TextureRegion region{{left, top, 0}, {w, h, 1}};
+            LLGL::SrcImageDescriptor src(
+                LLGL::ImageFormat::RGBA, LLGL::DataType::UInt8,
+                boost::gil::interleaved_view_get_raw_data(data),
+                w * h * sizeof(LLGL::ColorRGBAub));
+            this->_renderer->WriteTexture(*this->texture, region, src);
+        }
+
+      private:
+        RenderSystem *_renderer;
     };
     std::map<std::shared_ptr<Image>, Texture> _textures;
 
-    Texture _canvas_tex;
+    std::shared_ptr<Texture> _canvas_tex;
     LLGL::Buffer *_canvas_vtx{};
     LLGL::Buffer *_canvas_idx{};
-    LLGL::Extent2D _canvas_tex_size;
+
     LLGL::RenderTarget *_render_target;
 
     // first cmd
@@ -222,6 +304,7 @@ class Canvas {
     }
 
     void _add_cmd();
+    const std::vector<DrawCmd> &_get_draw_cmd();
 
     void _save();
     void _restore();

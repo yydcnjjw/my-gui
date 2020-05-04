@@ -102,10 +102,12 @@ void TJS2Script::_load_from_stream(std::shared_ptr<std::istream> is) {
             this->script =
                 codecvt::to_utf<char>(code, encode, codecvt::method_type::stop);
         } catch (codecvt::conversion_error &) {
+            this->script.clear();
             continue;
         }
-        break;
+        return;
     }
+    throw std::runtime_error("tjs2 script codecvt failure");
 }
 
 std::unique_ptr<ResourceMgr> ResourceMgr::create(AsyncTask *task) {

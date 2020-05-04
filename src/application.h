@@ -3,6 +3,7 @@
 #include <media/audio_mgr.h>
 #include <my_gui.h>
 #include <render/window/window_mgr.h>
+#include <render/canvas.h>
 #include <storage/font_mgr.h>
 #include <storage/resource_mgr.hpp>
 #include <util/async_task.hpp>
@@ -16,7 +17,7 @@ class Application {
     virtual ~Application() = default;
     virtual void run() = 0;
 
-    virtual void quit() = 0;
+    virtual void quit(bool is_error = false) = 0;
 
     virtual EventBus *ev_bus() const = 0;
     virtual WindowMgr *win_mgr() const = 0;
@@ -25,6 +26,7 @@ class Application {
     virtual ResourceMgr *resource_mgr() const = 0;
     virtual AudioMgr *audio_mgr() const = 0;
     virtual LLGL::RenderSystem *renderer() const = 0;
+    virtual std::shared_ptr<Canvas> make_canvas(Window *) = 0;
     virtual bool
     get_program_option(const std::string &option,
                        program_options::variable_value &value) const = 0;

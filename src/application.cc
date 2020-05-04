@@ -18,7 +18,7 @@ class PosixApplication : public my::Application {
         // XXX:
         pthread_setname_np(pthread_self(), "main");
         LLGL::Log::SetReportCallbackStd();
-        this->_parse_program_options(argc, argv, opts_desc);        
+        this->_parse_program_options(argc, argv, opts_desc);
     }
 
     ~PosixApplication() override {}
@@ -32,7 +32,9 @@ class PosixApplication : public my::Application {
         }
     }
 
-    void quit() override { this->_ev_bus->post<my::QuitEvent>(); }
+    void quit(bool is_error) override {
+        this->_ev_bus->post<my::QuitEvent>(is_error);
+    }
 
     my::EventBus *ev_bus() const override { return this->_ev_bus.get(); }
     my::WindowMgr *win_mgr() const override { return this->_win_mgr.get(); };
@@ -50,6 +52,12 @@ class PosixApplication : public my::Application {
 
     LLGL::RenderSystem *renderer() const override {
         return this->_renderer.get();
+    }
+
+    std::shared_ptr<my::Canvas> make_canvas(my::Window *win) override {
+        return std::make_shared<my::Canvas>(
+            this->renderer(), win, this->ev_bus(), this->resource_mgr(),
+            this->font_mgr());
     }
 
     program_options::option_description &get_option_desc() {

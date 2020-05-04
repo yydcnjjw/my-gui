@@ -3,8 +3,11 @@
 #include <cstdarg>
 #include <cstring>
 
+#include <fstream>
 #include <future>
 #include <iostream>
+
+#include <my_gui.h>
 
 namespace {
 class StdLoggerOutput : public Logger::LoggerOutput {
@@ -13,12 +16,41 @@ class StdLoggerOutput : public Logger::LoggerOutput {
         : Logger::LoggerOutput(level) {}
     ~StdLoggerOutput() override = default;
     void operator()(const Logger::LogMsg &msg) override {
+        std::unique_lock<std::mutex> l_lock(this->_lock);
         std::cout << msg.format() << std::endl;
         if (msg.level == Logger::ERROR) {
             std::terminate();
         }
     };
+
+  private:
+    std::mutex _lock;
 };
+
+class FileLoggerOutput : public Logger::LoggerOutput {
+  public:
+    explicit FileLoggerOutput(const my::fs::path &path,
+                              Logger::Level level = Logger::INFO)
+        : Logger::LoggerOutput(level) {
+        my::fs::remove(path);
+        this->_ofs.exceptions(std::ios::failbit | std::ios::badbit);
+        this->_ofs.open(path);
+    }
+    ~FileLoggerOutput() override = default;
+    void operator()(const Logger::LogMsg &msg) override {
+        std::unique_lock<std::mutex> l_lock(this->_lock);
+        this->_ofs << msg.format() << std::endl;
+        this->_ofs.flush();
+        if (msg.level == Logger::ERROR) {
+            std::terminate();
+        }
+    };
+
+  private:
+    std::mutex _lock;
+    std::ofstream _ofs;
+};
+
 } // namespace
 
 const Logger::bitmap Logger::logger_all_target = bitmap().set();
@@ -52,6 +84,8 @@ Logger::Logger() : _buf(4096, 0) {
 
     // init output target
     this->addLogOutputTarget(std::make_shared<StdLoggerOutput>(Logger::DEBUG));
+    this->addLogOutputTarget(
+        std::make_shared<FileLoggerOutput>("log.txt", Logger::DEBUG));
 }
 
 void Logger::Log(Logger::bitmap bit, Logger::Level type, const char *file_name,

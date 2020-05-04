@@ -1,6 +1,7 @@
 #include "audio_mgr.h"
 
 #include <exception>
+#include <fstream>
 
 #include <boost/iostreams/copy.hpp>
 
@@ -93,20 +94,29 @@ class SDLAudioMgr : public my::AudioMgr {
 } // namespace
 
 namespace my {
-
+std::atomic_int Audio::_id = 0;
 Audio::Audio(const fs::path &path) : Resource(path) {
-    if (!(this->sample = Mix_LoadWAV(path.c_str()))) {
+    if (!(this->sample = ::Mix_LoadWAV(path.c_str()))) {
         throw std::runtime_error(Mix_GetError());
     }
 }
 
 Audio::Audio(const fs::path &path, std::shared_ptr<std::istream> is)
     : Resource(path) {
-    std::stringstream ss;
-    boost::iostreams::copy(*is, ss);
-    auto wave = ss.str();
-    if (!(this->sample =
-              ::Mix_QuickLoad_WAV(reinterpret_cast<uint8_t *>(wave.data())))) {
+
+    if (!my::fs::exists("tmp")) {
+        my::fs::create_directory("tmp");
+    }
+
+    this->_tmp /= "tmp";
+    this->_tmp /= std::to_string(Audio::_id);
+    this->_tmp.replace_extension(path.extension());
+    std::ofstream ofs;
+    ofs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    ofs.open(_tmp);
+    boost::iostreams::copy(*is, ofs);
+
+    if (!(this->sample = ::Mix_LoadWAV(this->_tmp.c_str()))) {
         throw std::runtime_error(Mix_GetError());
     }
 }
@@ -116,7 +126,10 @@ void Audio::set_volume(uint8_t volume) {
 }
 uint8_t Audio::get_volume() { return sample->volume; }
 
-Audio::~Audio() { ::Mix_FreeChunk(this->sample); }
+Audio::~Audio() {
+    ::Mix_FreeChunk(this->sample);
+    my::fs::remove(this->_tmp);
+}
 
 std::unique_ptr<AudioMgr> AudioMgr::create() {
     return std::make_unique<SDLAudioMgr>();

@@ -28,8 +28,7 @@ template <typename T> class Event : public IEvent {
         return std::make_shared<Event<T>>(data);
     }
 
-    template <typename... Args>
-    static decltype(auto) make(Args &&... args) {
+    template <typename... Args> static decltype(auto) make(Args &&... args) {
         return make(std::make_shared<T>(std::forward<Args>(args)...));
     }
 
@@ -39,7 +38,11 @@ template <typename T> class Event : public IEvent {
     std::shared_ptr<T> data;
 };
 
-struct QuitEvent {};
+struct QuitEvent {
+    bool is_on_error{false};
+    QuitEvent(bool is_on_error = false) : is_on_error(is_on_error) {}
+};
+    
 class EventBus {
   public:
     EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {}

@@ -143,6 +143,7 @@ Canvas::Canvas(RenderSystem *renderer, Window *win, EventBus *bus,
     {
         this->_queue = renderer->GetCommandQueue();
         this->_commands = renderer->CreateCommandBuffer();
+        this->_fence = renderer->CreateFence();
     }
 
     this->_make_context_resource();
@@ -174,25 +175,25 @@ void Canvas::_make_context_resource() {
     }
 
     {
-        this->_canvas_tex_size = {win_size.w, win_size.h};
-        this->_canvas_tex.texture =
-            this->_renderer->CreateTexture(LLGL::Texture2DDesc(
-                LLGL::Format::RGBA8UNorm, this->_canvas_tex_size.width,
-                this->_canvas_tex_size.height));
+        auto canvas_tex = this->_renderer->CreateTexture(LLGL::Texture2DDesc(
+            LLGL::Format::RGBA8UNorm, win_size.w, win_size.h));
         LLGL::ResourceHeapDescriptor resource_heap_desc;
         {
             resource_heap_desc.pipelineLayout = this->_pipeline_layout;
-            resource_heap_desc.resourceViews = {
-                this->_constant, this->_canvas_tex.texture, this->_sampler};
+            resource_heap_desc.resourceViews = {this->_constant, canvas_tex,
+                                                this->_sampler};
         }
 
-        this->_canvas_tex.resource =
+        auto canvas_tex_resource =
             this->_renderer->CreateResourceHeap(resource_heap_desc);
 
+        this->_canvas_tex = std::make_shared<Texture>(
+            canvas_tex, canvas_tex_resource, this->_renderer);
+
         LLGL::RenderTargetDescriptor desc;
-        desc.resolution = this->_canvas_tex_size;
+        desc.resolution = this->_canvas_tex->get_size();
         desc.attachments = {LLGL::AttachmentDescriptor{
-            LLGL::AttachmentType::Color, this->_canvas_tex.texture}};
+            LLGL::AttachmentType::Color, this->_canvas_tex->texture}};
         this->_render_target = this->_renderer->CreateRenderTarget(desc);
         std::vector<DrawVert> canvas_vtx{{{0, 0}, {0, 0}},
                                          {{win_size.w, 0}, {1, 0}},
@@ -232,7 +233,7 @@ void Canvas::_make_context_resource() {
 }
 
 void Canvas::_release_context_resource() {
-    this->_canvas_tex.release(this->_renderer);
+    this->_canvas_tex->release();
     this->_renderer->Release(*this->_canvas_vtx);
     this->_renderer->Release(*this->_canvas_idx);
 
@@ -249,7 +250,6 @@ void Canvas::_resize_handle() {
     }
     GLOG_D("resize %d, %d --------------------------------------------",
            win_size.w, win_size.h);
-    this->_queue->WaitIdle();
     this->_release_context_resource();
     this->_make_context_resource();
 }
@@ -269,6 +269,7 @@ Canvas &Canvas::draw_image(std::shared_ptr<Image> image, const glm::vec2 &p_min,
         LLGL::SrcImageDescriptor src_image_desc{
             LLGL::ImageFormat::RGBA, LLGL::DataType::UInt8, image->raw_data(),
             image->width() * image->height() * 4};
+
         auto texture = this->_renderer->CreateTexture(
             LLGL::Texture2DDesc(LLGL::Format::RGBA8UNorm, image->width(),
                                 image->height()),
@@ -282,7 +283,7 @@ Canvas &Canvas::draw_image(std::shared_ptr<Image> image, const glm::vec2 &p_min,
         }
 
         auto resource = this->_renderer->CreateResourceHeap(resource_heap_desc);
-        this->_textures.insert({image, {texture, resource}});
+        this->_textures.insert({image, {texture, resource, this->_renderer}});
     }
 
     this->_prim_rect_uv(p_min, p_max, uv_min, uv_max, {255, 255, 255, alpha});
@@ -323,8 +324,7 @@ Canvas &Canvas::fill_text(const std::string &text, const glm::vec2 &p,
     return *this;
 }
 
-const std::vector<DrawCmd> &Canvas::get_draw_cmd() {
-    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+const std::vector<DrawCmd> &Canvas::_get_draw_cmd() {
     this->_add_cmd();
     return this->_cmd_list;
 }
@@ -455,8 +455,6 @@ void Canvas::_add_convex_poly_fill(const DrawPath &path,
 }
 
 void Canvas::render() {
-
-    auto &draw_cmd = this->get_draw_cmd();
     {
         std::unique_lock<std::shared_mutex> l_lock(this->_lock);
         this->_resize_handle();
@@ -464,7 +462,6 @@ void Canvas::render() {
             return;
         }
         {
-            this->_queue->WaitIdle();
             if (this->_vtx_buf) {
                 this->_renderer->Release(*this->_vtx_buf);
                 this->_vtx_buf = nullptr;
@@ -502,7 +499,7 @@ void Canvas::render() {
                     this->_commands->SetPipelineState(*this->_pipeline[0]);
                     this->_commands->SetVertexBuffer(*this->_vtx_buf);
                     this->_commands->SetIndexBuffer(*this->_idx_buf);
-                    for (const auto &cmd : draw_cmd) {
+                    for (const auto &cmd : this->_get_draw_cmd()) {
                         if (cmd.state.image) {
                             auto texture =
                                 this->_textures.at(cmd.state.image).resource;
@@ -528,7 +525,7 @@ void Canvas::render() {
                     this->_commands->SetViewport(
                         this->_context->GetResolution());
                     this->_commands->SetResourceHeap(
-                        *this->_canvas_tex.resource);
+                        *this->_canvas_tex->resource);
                     this->_commands->DrawIndexed(6, 0);
                 }
                 this->_commands->EndRenderPass();
@@ -545,6 +542,9 @@ void Canvas::render() {
                 this->_resize_handle();
                 return;
             }
+            this->_queue->Submit(*this->_fence);
+            this->_queue->WaitFence(*this->_fence,
+                                    std::numeric_limits<std::uint64_t>::max());
         }
     }
 

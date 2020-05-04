@@ -16,6 +16,9 @@ class Audio : public Resource {
 
     Mix_Chunk *sample;
     int channel = -1;
+private:
+    static std::atomic_int _id;
+    my::fs::path _tmp;
 };
 
 class AudioMgr {

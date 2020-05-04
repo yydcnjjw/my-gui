@@ -121,6 +121,7 @@ class ResourceMgr {
                 auto archive = this->_exist_and_get_archive(path);
 
                 if (archive.has_value()) {
+                    // TODO: "path" to var
                     const auto query_path = uri.params().at("path");
                     path = uri.encoded_url().to_string();
                     // from stream read
@@ -211,6 +212,7 @@ class ResourceMgr {
                 auto archive = it->second(path);
                 std::unique_lock<std::shared_mutex> l_w_lock(this->_lock);
                 this->_archives.insert({path, archive});
+                return archive;
             }
         }
         return std::nullopt;
