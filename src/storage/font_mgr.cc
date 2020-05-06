@@ -67,13 +67,13 @@ void blit_glyph(const FT_Bitmap *ft_bitmap, uint8_t *dst, uint32_t dst_pitch) {
 
 class MyFont : public my::Font {
   public:
-    MyFont(FT_Library ft_lib, const std::string &path) : _font_size(16) {
+    MyFont(FT_Library ft_lib, const std::string &path) : _font_size(24) {
         FT_Error e = ::FT_New_Face(ft_lib, path.c_str(), 0, &this->_ft_face);
         if (e) {
             throw std::runtime_error(FT_Error_String(e));
         }
 
-        FT_Set_Pixel_Sizes(this->_ft_face, 0, this->_font_size);
+        ::FT_Set_Pixel_Sizes(this->_ft_face, 0, this->_font_size);
     }
     ~MyFont() { FT_Done_Face(this->_ft_face); }
 

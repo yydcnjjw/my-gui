@@ -219,7 +219,11 @@ void Canvas::_make_context_resource() {
             pipeline_desc.renderPass = this->_render_target->GetRenderPass();
             pipeline_desc.pipelineLayout = this->_pipeline_layout;
             pipeline_desc.rasterizer.cullMode = LLGL::CullMode::Back;
-            pipeline_desc.blend.targets[0] = {true};
+            LLGL::BlendTargetDescriptor blend0;
+            {
+                blend0.blendEnabled = true;
+                pipeline_desc.blend.targets[0] = blend0;
+            }
         }
 
         this->_pipeline[0] =
@@ -322,6 +326,52 @@ Canvas &Canvas::fill_text(const std::string &text, const glm::vec2 &p,
     }
     this->_restore();
     return *this;
+}
+
+std::shared_ptr<RGBAImage> Canvas::get_image_data(const PixelPos &offset,
+                                                  const Size2D &size) {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+
+    Rect src_rect{offset, size};
+
+    auto [canvas_w, canvas_h] = this->_canvas_tex->get_size();
+    Rect canvas_rect{{0, 0}, {canvas_w, canvas_h}};
+
+    Rect rect{};
+    try {
+        rect = canvas_rect.cut(src_rect);
+    } catch (RectOutRangeError &) {
+        return std::make_shared<RGBAImage>();
+    }
+
+    return this->_canvas_tex->get_image_data(rect.left, rect.top, rect.w(),
+                                             rect.h());
+}
+
+void Canvas::put_image_data(std::shared_ptr<RGBAImage> data,
+                            const PixelPos &offset) {
+    std::unique_lock<std::shared_mutex> l_lock(this->_lock);
+    uint32_t src_w = data->width();
+    uint32_t src_h = data->height();
+    Rect src_rect{offset, {src_w, src_h}};
+
+    auto [canvas_w, canvas_h] = this->_canvas_tex->get_size();
+    Rect canvas_rect{{0, 0}, {canvas_w, canvas_h}};
+
+    Rect rect{};
+    try {
+        rect = canvas_rect.cut(src_rect);
+    } catch (RectOutRangeError &) {
+        return;
+    }
+
+    RGBAImage::const_view_t image_view{};
+
+    PixelPos off{rect.pos() - src_rect.pos()};
+    image_view = boost::gil::subimage_view(
+        boost::gil::view(*data), {off.x, off.y}, {rect.w(), rect.h()});
+
+    this->_canvas_tex->put_image_data(image_view, rect.left, rect.top);
 }
 
 const std::vector<DrawCmd> &Canvas::_get_draw_cmd() {

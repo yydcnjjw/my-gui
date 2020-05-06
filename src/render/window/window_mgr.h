@@ -72,6 +72,12 @@ struct Size2D {
     bool operator==(Size2D &size) {
         return this->w == size.w && this->h == size.h;
     }
+
+    Size2D &operator=(const Size2D &size) {
+        this->w = size.w;
+        this->h = size.h;
+        return *this;
+    }
 };
 
 class Window {

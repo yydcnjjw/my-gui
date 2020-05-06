@@ -4,6 +4,7 @@
 #include <stack>
 #include <vector>
 
+#include <boost/format.hpp>
 #include <boost/gil.hpp>
 #include <glm/glm.hpp>
 #include <render/window/window_mgr.h>
@@ -16,6 +17,56 @@ namespace my {
 typedef LLGL::RenderSystem RenderSystem;
 typedef glm::u8vec4 ColorRGBAub;
 typedef boost::gil::rgba8_image_t RGBAImage;
+
+class RectOutRangeError : public std::range_error {
+  public:
+    explicit RectOutRangeError(const std::string &msg) throw()
+        : std::range_error(msg) {}
+};
+struct Rect {
+    int left{0};
+    int top{0};
+    int right{0};
+    int bottom{0};
+
+    Rect() {}
+    Rect(const my::PixelPos &pos, const my::Size2D &size)
+        : left(pos.x), top(pos.y), right(pos.x + size.w),
+          bottom(pos.y + size.h) {}
+
+    my::PixelPos pos() { return {this->left, this->top}; }
+
+    my::Size2D size() { return my::Size2D(this->w(), this->h()); }
+
+    int w() const { return this->right - this->left; }
+
+    int h() const { return this->bottom - this->top; }
+
+    bool empty() { return this->w() <= 0 || this->h() <= 0; }
+
+    // bool contains(const my::PixelPos &pos) {}
+
+    Rect cut(const Rect &rect) const {
+        Rect cut{};
+
+        if (rect.left > this->right || rect.top > this->bottom ||
+            rect.right < this->left || rect.bottom < this->top) {
+            throw RectOutRangeError("");
+        }
+
+        cut.left = rect.left < this->left ? this->left : rect.left;
+        cut.top = rect.top < this->top ? this->top : rect.top;
+        cut.right = rect.right > this->right ? this->right : rect.right;
+        cut.bottom = rect.bottom > this->bottom ? this->bottom : rect.bottom;
+        return cut;
+    }
+
+    std::string str() const {
+        return (boost::format("{%1%,%2%}<=>{%3%,%4%}") % this->left %
+                this->top % this->right % this->bottom)
+            .str();
+    }
+};
 
 struct DrawVert {
     glm::vec2 pos;
@@ -135,49 +186,10 @@ class Canvas {
                       const ColorRGBAub &color = {255, 255, 255, 255});
 
     std::shared_ptr<RGBAImage> get_image_data(const PixelPos &offset,
-                                              const Size2D &size) {
-        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
-
-        auto [canvas_w, canvas_h] = this->_canvas_tex->get_size();
-        uint32_t w{size.w}, h{size.h};
-        if (offset.x + size.w > canvas_w) {
-            w = canvas_w - offset.x;
-        }
-
-        if (offset.y + size.h > canvas_h) {
-            h = canvas_h - offset.y;
-        }
-
-        return this->_canvas_tex->get_image_data(offset.x, offset.y, w, h);
-    }
+                                              const Size2D &size);
 
     void put_image_data(std::shared_ptr<RGBAImage> data,
-                        const PixelPos &offset) {
-        std::unique_lock<std::shared_mutex> l_lock(this->_lock);
-        uint32_t src_w = data->width();
-        uint32_t src_h = data->height();
-        auto [canvas_w, canvas_h] = this->_canvas_tex->get_size();
-
-        uint32_t w{src_w}, h{src_h};
-        if (offset.x + src_w > canvas_w) {
-            w = canvas_w - offset.x;
-        }
-
-        if (offset.y + src_h > canvas_h) {
-            h = canvas_h - offset.y;
-        }
-
-        RGBAImage::const_view_t image_view{};
-
-        if (w != src_w && h != src_h) {
-            image_view = boost::gil::subimage_view(boost::gil::view(*data),
-                                                   {0, 0}, {w, h});
-        } else {
-            image_view = boost::gil::const_view(*data);
-        }
-
-        this->_canvas_tex->put_image_data(image_view, offset.x, offset.y);
-    }
+                        const PixelPos &offset);
 
     void render();
 
