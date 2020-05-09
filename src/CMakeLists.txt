@@ -5,10 +5,12 @@ set(CMAKE_CXX_FLAGS ${COMPILE_FLAGS})
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(my-gui_inc
-        vulkan
-        ${msdfgen_inc}
-        ${vinniefalco.url_inc}
-        ${LLGL_inc})
+  # build
+  ${DEPS_DIR}/include
+  ${msdfgen_inc}
+  ${vinniefalco.url_inc}
+  ${LLGL_inc}
+  ${skia_inc})
 
 set(my-gui_src
   main.cc
@@ -25,8 +27,8 @@ set(my-gui_src
   media/audio_mgr.cc
   )
 
+# system
 find_package(Threads REQUIRED)
-find_package(rxcpp CONFIG REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2Mixer REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
@@ -34,30 +36,41 @@ find_package(Boost REQUIRED COMPONENTS
 find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Vulkan REQUIRED)
-find_package(glm CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
-message("ffmpeg: ${FFMPEG_LIBRARIES}")
-set(DEPS
-  Threads::Threads
-  ${CMAKE_DL_LIBS}
-  glm::glm
-  rxcpp
-  SDL2::SDL2
-  ${SDL2Mixer_LIBRARIES}
+find_package(cairo REQUIRED)
+
+# build
+find_package(glm CONFIG REQUIRED)
+find_package(rxcpp CONFIG REQUIRED)
+
+set(boost_deps
   Boost::thread
   Boost::program_options
   Boost::iostreams
   Boost::locale
   Boost::timer
-  Boost::coroutine
+  Boost::coroutine)
+
+set(DEPS
+  # system
+  Threads::Threads
+  ${CMAKE_DL_LIBS}
+  SDL2::SDL2
+  ${SDL2Mixer_LIBRARIES}
+  # ${cairo_LIBRARIES}
   ${FFMPEG_LIBRARIES}
   Freetype::Freetype
   Vulkan::Vulkan
   PNG::PNG
   JPEG::JPEG
+  ${boost_deps}
+  # build
+  glm::glm
+  rxcpp
   ${LLGL_lib}
   ${msdfgen_lib}
+  ${skia_lib}
   )
 
 add_executable(my-gui ${my-gui_src})

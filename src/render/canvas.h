@@ -18,55 +18,43 @@ typedef LLGL::RenderSystem RenderSystem;
 typedef glm::u8vec4 ColorRGBAub;
 typedef boost::gil::rgba8_image_t RGBAImage;
 
+    
 class RectOutRangeError : public std::range_error {
   public:
     explicit RectOutRangeError(const std::string &msg) throw()
         : std::range_error(msg) {}
 };
-struct Rect {
-    int left{0};
-    int top{0};
-    int right{0};
-    int bottom{0};
+// struct Rect {
+//     int left{0};
+//     int top{0};
+//     int right{0};
+//     int bottom{0};
 
-    Rect() {}
-    Rect(const my::PixelPos &pos, const my::Size2D &size)
-        : left(pos.x), top(pos.y), right(pos.x + size.w),
-          bottom(pos.y + size.h) {}
+//     Rect() {}
+//     Rect(const my::Point2D &pos, const my::Size2D &size)
+//         : left(pos.x), top(pos.y), right(pos.x + size.w),
+//           bottom(pos.y + size.h) {}
 
-    my::PixelPos pos() { return {this->left, this->top}; }
+//     my::Point2D pos() { return {this->left, this->top}; }
 
-    my::Size2D size() { return my::Size2D(this->w(), this->h()); }
+//     my::Size2D size() { return my::Size2D(this->w(), this->h()); }
 
-    int w() const { return this->right - this->left; }
+//     int w() const { return this->right - this->left; }
 
-    int h() const { return this->bottom - this->top; }
+//     int h() const { return this->bottom - this->top; }
 
-    bool empty() { return this->w() <= 0 || this->h() <= 0; }
+//     bool empty() { return this->w() <= 0 || this->h() <= 0; }
 
-    // bool contains(const my::PixelPos &pos) {}
+//     // bool contains(const my::PixelPos &pos) {}
 
-    Rect cut(const Rect &rect) const {
-        Rect cut{};
+//     Rect cut(const Rect &rect) const;
 
-        if (rect.left > this->right || rect.top > this->bottom ||
-            rect.right < this->left || rect.bottom < this->top) {
-            throw RectOutRangeError("");
-        }
-
-        cut.left = rect.left < this->left ? this->left : rect.left;
-        cut.top = rect.top < this->top ? this->top : rect.top;
-        cut.right = rect.right > this->right ? this->right : rect.right;
-        cut.bottom = rect.bottom > this->bottom ? this->bottom : rect.bottom;
-        return cut;
-    }
-
-    std::string str() const {
-        return (boost::format("{%1%,%2%}<=>{%3%,%4%}") % this->left %
-                this->top % this->right % this->bottom)
-            .str();
-    }
-};
+//     std::string str() const {
+//         return (boost::format("{%1%,%2%}<=>{%3%,%4%}") % this->left %
+//                 this->top % this->right % this->bottom)
+//             .str();
+//     }
+// };
 
 struct DrawVert {
     glm::vec2 pos;
@@ -185,11 +173,11 @@ class Canvas {
                       my::Font *font = nullptr, float font_size = 16,
                       const ColorRGBAub &color = {255, 255, 255, 255});
 
-    std::shared_ptr<RGBAImage> get_image_data(const PixelPos &offset,
+    std::shared_ptr<RGBAImage> get_image_data(const Point2D &offset,
                                               const Size2D &size);
 
     void put_image_data(std::shared_ptr<RGBAImage> data,
-                        const PixelPos &offset);
+                        const Point2D &offset);
 
     void render();
 
@@ -304,7 +292,7 @@ class Canvas {
     std::shared_mutex _lock;
 
     my::Window *_window;
-    my::Size2D _size;
+    my::ISize2D _size;
 
     void _make_context_resource();
     void _release_context_resource();

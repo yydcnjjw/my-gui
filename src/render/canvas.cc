@@ -7,6 +7,21 @@
 #include <boost/format.hpp>
 namespace my {
 
+// Rect Rect::cut(const Rect &rect) const {
+//     Rect cut{};
+
+//     if (rect.left > this->right || rect.top > this->bottom ||
+//         rect.right < this->left || rect.bottom < this->top) {
+//         throw RectOutRangeError("");
+//     }
+
+//     cut.left = std::max(rect.left, this->left);
+//     cut.top =  std::max(rect.top, this->top);
+//     cut.right = std::min(rect.right, this->right);
+//     cut.bottom = std::min(rect.bottom, this->bottom);
+//     return cut;
+// }
+
 DrawPath::DrawPath(const glm::vec2 begin) { this->_points.push_back(begin); }
 
 DrawPath &DrawPath::line_to(const glm::vec2 &pos) {
@@ -107,7 +122,7 @@ Canvas::Canvas(RenderSystem *renderer, Window *win, EventBus *bus,
     {
         auto win_size = this->_window->get_size();
         this->_const_block.scale =
-            glm::vec2(2.0f / win_size.w, 2.0f / win_size.h);
+            glm::vec2(2.0f / win_size.width(), 2.0f / win_size.height());
         this->_const_block.translate = glm::vec2(-1.0f);
         this->_constant = this->_renderer->CreateBuffer(
             LLGL::ConstantBufferDesc(sizeof(ConstBlock)), &this->_const_block);
@@ -163,11 +178,15 @@ Canvas::~Canvas() {
 void Canvas::_make_context_resource() {
 
     auto win_size = this->_window->get_size();
-    GLOG_D("make context win size %d,%d", win_size.w, win_size.h);
+
+    uint32_t win_width = SkToU32(win_size.width());
+    uint32_t win_height = SkToU32(win_size.height());
+
+    GLOG_D("make context win size %d,%d", win_width, win_height);
     this->_size = win_size;
     {
         LLGL::RenderContextDescriptor context_desc;
-        context_desc.videoMode.resolution = {win_size.w, win_size.h};
+        context_desc.videoMode.resolution = {win_width, win_height};
         // context_desc.vsync.enabled = true;
 
         this->_context = this->_renderer->CreateRenderContext(
@@ -176,7 +195,7 @@ void Canvas::_make_context_resource() {
 
     {
         auto canvas_tex = this->_renderer->CreateTexture(LLGL::Texture2DDesc(
-            LLGL::Format::RGBA8UNorm, win_size.w, win_size.h));
+            LLGL::Format::RGBA8UNorm, win_width, win_height));
         LLGL::ResourceHeapDescriptor resource_heap_desc;
         {
             resource_heap_desc.pipelineLayout = this->_pipeline_layout;
@@ -196,9 +215,9 @@ void Canvas::_make_context_resource() {
             LLGL::AttachmentType::Color, this->_canvas_tex->texture}};
         this->_render_target = this->_renderer->CreateRenderTarget(desc);
         std::vector<DrawVert> canvas_vtx{{{0, 0}, {0, 0}},
-                                         {{win_size.w, 0}, {1, 0}},
-                                         {{win_size.w, win_size.h}, {1, 1}},
-                                         {{0, win_size.h}, {0, 1}}};
+                                         {{win_width, 0}, {1, 0}},
+                                         {{win_width, win_height}, {1, 1}},
+                                         {{0, win_height}, {0, 1}}};
         std::vector<uint32_t> canvas_idx{0, 1, 2, 0, 2, 3};
 
         this->_canvas_vtx = this->_renderer->CreateBuffer(
@@ -253,7 +272,7 @@ void Canvas::_resize_handle() {
         return;
     }
     GLOG_D("resize %d, %d --------------------------------------------",
-           win_size.w, win_size.h);
+           win_size.width(), win_size.height());
     this->_release_context_resource();
     this->_make_context_resource();
 }
@@ -328,8 +347,8 @@ Canvas &Canvas::fill_text(const std::string &text, const glm::vec2 &p,
     return *this;
 }
 
-std::shared_ptr<RGBAImage> Canvas::get_image_data(const PixelPos &offset,
-                                                  const Size2D &size) {
+std::shared_ptr<RGBAImage> Canvas::get_image_data(const IPoint2D &offset,
+                                                  const ISize2D &size) {
     std::unique_lock<std::shared_mutex> l_lock(this->_lock);
 
     Rect src_rect{offset, size};

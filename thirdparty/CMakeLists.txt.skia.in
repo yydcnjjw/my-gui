@@ -1,0 +1,32 @@
+cmake_minimum_required(VERSION 2.8.2)
+project(@dep_name@ NONE)
+
+include(ExternalProject)
+ExternalProject_Add(@dep_name@
+  GIT_REPOSITORY https://skia.googlesource.com/skia.git
+  GIT_TAG master
+  SOURCE_DIR "@dep_src_dir@"
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=@DEPS_DIR@
+  UPDATE_COMMAND ""
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+  )
+
+set(build_dir out/Release)
+
+add_custom_target(skia_build ALL
+  COMMAND bin/fetch-gn
+  COMMAND python2 tools/git-sync-deps
+  COMMAND cp .gn back.gn
+  COMMAND echo 'script_executable = \"python2\"' >> .gn
+  COMMAND bin/gn gen ${build_dir} --args='is_official_build=true'
+  COMMAND ninja -C ${build_dir} -j 4
+  COMMAND mv back.gn .gn
+  COMMAND mkdir -p @DEPS_DIR@/include/skia/include
+  COMMAND cp -r @dep_src_dir@/include/* @DEPS_DIR@/include/skia/include
+  # COMMAND cp @dep_src_dir@/${build_dir}/gen/skia.h @DEPS_DIR@/include/skia
+  WORKING_DIRECTORY @dep_src_dir@
+  )
+add_dependencies(skia_build skia)

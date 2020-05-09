@@ -3,27 +3,12 @@
 #include <fstream>
 
 #include <boost/format.hpp>
-#include <boost/gil/extension/io/bmp.hpp>
-#include <boost/gil/extension/io/jpeg.hpp>
-#include <boost/gil/extension/io/png.hpp>
-#include <boost/gil/io/read_image.hpp>
+
 #include <boost/iostreams/copy.hpp>
 
 #include <util/codecvt.h>
 
 namespace my {
-std::shared_ptr<std::ifstream> make_ifstream(const fs::path &path) {
-    auto ifs = std::make_shared<std::ifstream>();
-    ifs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ifs->open(path);
-    return ifs;
-}
-std::shared_ptr<std::ofstream> make_ofstream(const fs::path &path) {
-    auto ofs = std::make_shared<std::ofstream>();
-    ofs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ofs->open(path);
-    return ofs;
-}
 
 Image::Image(const fs::path &path) : Resource(path) {
     this->_load_from_stream(path, make_ifstream(path));

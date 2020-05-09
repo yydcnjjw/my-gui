@@ -28,13 +28,13 @@ class SDLWindow : public my::Window {
 
         LLGL::Extent2D GetContentSize() const override {
             auto size = this->_win->get_frame_buffer_size();
-            return {size.w, size.h};
+            return {SkToU32(size.width()), SkToU32(size.height())};
         };
 
         bool
         AdaptForVideoMode(LLGL::VideoModeDescriptor &videoModeDesc) override {
-            this->_win->set_size({videoModeDesc.resolution.width,
-                                  videoModeDesc.resolution.height});
+            this->_win->set_size({SkToInt(videoModeDesc.resolution.width),
+                                  SkToInt(videoModeDesc.resolution.height)});
             this->_win->set_full_screen(videoModeDesc.fullscreen);
             return true;
         }
@@ -61,51 +61,53 @@ class SDLWindow : public my::Window {
         return this->_surface;
     };
 
-    my::Size2D get_frame_buffer_size() override {
+    my::ISize2D get_frame_buffer_size() override {
         // TODO: gl vulkan
         int w, h;
         SDL_Vulkan_GetDrawableSize(this->_sdl_window, &w, &h);
-        return my::Size2D(w, h);
+        return my::ISize2D::Make(w, h);
     }
 
-    void set_frame_buffer_size(const my::Size2D &size) override {
+    void set_frame_buffer_size(const my::ISize2D &size) override {
         this->set_size(size);
     }
 
-    my::Size2D get_min_size() override {
+    my::ISize2D get_min_size() override {
         int w, h;
         SDL_GetWindowMinimumSize(this->_sdl_window, &w, &h);
-        return my::Size2D(w, h);
+        return my::ISize2D::Make(w, h);
     }
-    my::Size2D get_max_size() override {
+    my::ISize2D get_max_size() override {
         int w, h;
         SDL_GetWindowMaximumSize(this->_sdl_window, &w, &h);
-        return my::Size2D(w, h);
+        return my::ISize2D::Make(w, h);
     }
 
-    void set_min_size(const my::Size2D &size) override {
-        SDL_SetWindowMinimumSize(this->_sdl_window, size.w, size.h);
+    void set_min_size(const my::ISize2D &size) override {
+        SDL_SetWindowMinimumSize(this->_sdl_window, size.width(),
+                                 size.height());
     }
-    void set_max_size(const my::Size2D &size) override {
-        SDL_SetWindowMaximumSize(this->_sdl_window, size.w, size.h);
+    void set_max_size(const my::ISize2D &size) override {
+        SDL_SetWindowMaximumSize(this->_sdl_window, size.width(),
+                                 size.height());
     }
 
-    my::Size2D get_size() override {
+    my::ISize2D get_size() override {
         int w, h;
         SDL_GetWindowSize(this->_sdl_window, &w, &h);
-        return my::Size2D(w, h);
+        return my::ISize2D::Make(w, h);
     }
 
-    void set_size(const my::Size2D &size) override {
-        SDL_SetWindowSize(this->_sdl_window, size.w, size.h);
+    void set_size(const my::ISize2D &size) override {
+        SDL_SetWindowSize(this->_sdl_window, size.width(), size.height());
     }
-    my::PixelPos get_pos() override {
+    my::IPoint2D get_pos() override {
         int x, y;
         SDL_GetWindowPosition(this->_sdl_window, &x, &y);
         return {x, y};
     }
-    void set_pos(const my::PixelPos &pos) override {
-        SDL_SetWindowPosition(this->_sdl_window, pos.x, pos.y);
+    void set_pos(const my::IPoint2D &pos) override {
+        SDL_SetWindowPosition(this->_sdl_window, pos.x(), pos.y());
     }
 
     virtual void set_full_screen(bool full_screen) override {
@@ -136,8 +138,8 @@ class SDLWindow : public my::Window {
         SDL_ShowCursor(toggle ? SDL_ENABLE : SDL_DISABLE);
     }
 
-    void set_mouse_pos(const my::PixelPos &pos) override {
-        SDL_WarpMouseInWindow(this->_sdl_window, pos.x, pos.y);
+    void set_mouse_pos(const my::IPoint2D &pos) override {
+        SDL_WarpMouseInWindow(this->_sdl_window, pos.x(), pos.y());
     }
 
     SDL_Window *_sdl_window;
@@ -173,14 +175,16 @@ class SDLWindowMgr : public my::WindowMgr {
                 case SDL_MOUSEMOTION:
                     bus->post<my::MouseMotionEvent>(
                         sdl_event.motion.windowID,
-                        my::PixelPos{sdl_event.motion.x, sdl_event.motion.y},
-                        sdl_event.motion.xrel, sdl_event.motion.yrel,
+                        my::IPoint2D::Make(sdl_event.motion.x,
+                                           sdl_event.motion.y),
+                        my::ISize2D::Make(sdl_event.motion.xrel,
+                                          sdl_event.motion.yrel),
                         sdl_event.motion.state);
                     break;
                 case SDL_MOUSEWHEEL:
                     bus->post<my::MoushWheelEvent>(
                         sdl_event.wheel.windowID,
-                        my::PixelPos{sdl_event.wheel.x, sdl_event.wheel.y},
+                        my::IPoint2D{sdl_event.wheel.x, sdl_event.wheel.y},
                         sdl_event.wheel.which, sdl_event.wheel.direction);
                     break;
                 case SDL_KEYUP:
@@ -199,7 +203,7 @@ class SDLWindowMgr : public my::WindowMgr {
                         sdl_event.button.windowID, sdl_event.button.which,
                         sdl_event.button.button, sdl_event.button.state,
                         sdl_event.button.clicks,
-                        my::PixelPos{sdl_event.button.x, sdl_event.button.y});
+                        my::IPoint2D{sdl_event.button.x, sdl_event.button.y});
                     break;
                 default:
                     break;
@@ -270,8 +274,8 @@ class SDLWindowMgr : public my::WindowMgr {
         if (SDL_GetDesktopDisplayMode(0, &mode) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
-        this->_desktop_display_mode = {mode.format, mode.w, mode.h,
-                                       mode.refresh_rate};
+        this->_desktop_display_mode = {
+            mode.format, {mode.w, mode.h}, mode.refresh_rate};
     }
 };
 

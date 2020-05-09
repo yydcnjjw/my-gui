@@ -9,32 +9,18 @@
 #include <boost/url/url.hpp>
 
 #include <my_gui.h>
-#include <util/async_task.hpp>
 #include <storage/archive.h>
+#include <util/async_task.hpp>
+#include <util/uuid.hpp>
 
 namespace my {
 
-class Resource : boost::noncopyable {
+class Blob : public Resource, ResourceProvider {
   public:
-    explicit Resource(const fs::path &path) : _key(path) {}
-    virtual ~Resource() = default;
-    const std::string &get_key() { return this->_key; }
+    explicit Blob();
 
-  private:
-    std::string _key;
-};
-
-class Blob : public Resource {
-  public:
-    explicit Blob(const fs::path &path);
-    Blob(const fs::path &path, std::shared_ptr<std::istream> is);
-
-    u_char *data() {
-        return reinterpret_cast<u_char*>(this->_blob.data());
-    }
-    size_t size() {
-        return this->_blob.size();
-    }
+    u_char *data() { return reinterpret_cast<u_char *>(this->_blob.data()); }
+    size_t size() { return this->_blob.size(); }
 
   private:
     void _load_from_stream(std::shared_ptr<std::istream> is);
@@ -46,17 +32,15 @@ class Image : public Resource {
     explicit Image(const fs::path &path);
     Image(const fs::path &path, std::shared_ptr<std::istream> is);
     Image(const uint8_t *data, int w, int h);
-    
+
     [[nodiscard]] size_t width() const { return this->_w; }
     [[nodiscard]] size_t height() const { return this->_h; }
-    const uint8_t *raw_data() const {
-        return this->_data;
-    }
+    const uint8_t *raw_data() const { return this->_data; }
 
   private:
     void _load_from_stream(const fs::path &path,
                            std::shared_ptr<std::istream> is);
-    
+
     boost::gil::rgba8_image_t _image;
     const uint8_t *_data;
     int _w;
@@ -73,7 +57,6 @@ class TJS2Script : public Resource {
     void _load_from_stream(std::shared_ptr<std::istream> is);
 };
 
-typedef boost::urls::url uri;
 class ResourceMgr {
   public:
     ~ResourceMgr() = default;
