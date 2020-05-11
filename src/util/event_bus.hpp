@@ -1,6 +1,8 @@
 #pragma once
 
 #include <shared_mutex>
+#include <typeindex>
+#include <typeinfo>
 
 #include <rx.hpp>
 
@@ -8,20 +10,19 @@ namespace my {
 class IEvent {
   public:
     std::chrono::system_clock::time_point timestamp;
-    IEvent(size_t type_id)
-        : timestamp(std::chrono::system_clock::now()), _type_id(type_id) {}
+    IEvent(const std::type_index &type)
+        : timestamp(std::chrono::system_clock::now()), _type(type) {}
 
     virtual ~IEvent() = default;
-    template <typename T> bool is() {
-        return this->_type_id == typeid(T).hash_code();
-    }
+    template <typename T> bool is() { return this->_type == typeid(T); }
 
   private:
-    size_t _type_id;
+    std::type_index _type;
 };
+
 template <typename T> class Event : public IEvent {
   public:
-    Event(std::shared_ptr<T> t) : IEvent(typeid(T).hash_code()), data(t) {}
+    Event(std::shared_ptr<T> t) : IEvent(typeid(T)), data(t) {}
 
     template <typename... Args>
     static decltype(auto) make(std::shared_ptr<T> data) {
@@ -42,7 +43,7 @@ struct QuitEvent {
     bool is_on_error{false};
     QuitEvent(bool is_on_error = false) : is_on_error(is_on_error) {}
 };
-    
+
 class EventBus {
   public:
     EventBus() : _ev_bus_worker(rxcpp::observe_on_run_loop(this->_rlp)) {}

@@ -5,6 +5,13 @@
 
 namespace my {
 
+struct ArchiveFile {
+    fs::path path;
+    size_t arc_size;
+    size_t org_size;
+    std::unique_ptr<std::istream> is;
+};
+
 class Archive {
   public:
     Archive() = default;
@@ -12,7 +19,7 @@ class Archive {
 
     virtual bool exists(const fs::path &) = 0;
 
-    virtual std::shared_ptr<std::istream> extract(const fs::path &path) = 0;
+    virtual ArchiveFile extract(const fs::path &path) = 0;
 
     typedef std::function<std::shared_ptr<Archive>(const fs::path &)>
         make_archive_func;

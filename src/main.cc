@@ -10,9 +10,10 @@
 // #include <util/event_bus.hpp>
 // #include <fstream>
 
-#include <my_render.h>
+
 
 int main(int, char *[]) {
+
     // auto ev_bus = my::EventBus::create();
     // auto async_task = my::AsyncTask::create();
     // auto resource_mgr = my::ResourceMgr::create(async_task.get());

@@ -9,53 +9,11 @@
 #include <boost/url/url.hpp>
 
 #include <my_gui.h>
+#include <resource.h>
 #include <storage/archive.h>
 #include <util/async_task.hpp>
-#include <util/uuid.hpp>
 
 namespace my {
-
-class Blob : public Resource, ResourceProvider {
-  public:
-    explicit Blob();
-
-    u_char *data() { return reinterpret_cast<u_char *>(this->_blob.data()); }
-    size_t size() { return this->_blob.size(); }
-
-  private:
-    void _load_from_stream(std::shared_ptr<std::istream> is);
-    std::string _blob;
-};
-
-class Image : public Resource {
-  public:
-    explicit Image(const fs::path &path);
-    Image(const fs::path &path, std::shared_ptr<std::istream> is);
-    Image(const uint8_t *data, int w, int h);
-
-    [[nodiscard]] size_t width() const { return this->_w; }
-    [[nodiscard]] size_t height() const { return this->_h; }
-    const uint8_t *raw_data() const { return this->_data; }
-
-  private:
-    void _load_from_stream(const fs::path &path,
-                           std::shared_ptr<std::istream> is);
-
-    boost::gil::rgba8_image_t _image;
-    const uint8_t *_data;
-    int _w;
-    int _h;
-};
-
-class TJS2Script : public Resource {
-  public:
-    explicit TJS2Script(const fs::path &path);
-    TJS2Script(const fs::path &path, std::shared_ptr<std::istream> is);
-    std::string script;
-
-  private:
-    void _load_from_stream(std::shared_ptr<std::istream> is);
-};
 
 class ResourceMgr {
   public:
@@ -80,10 +38,11 @@ class ResourceMgr {
 
     static bool exist(const fs::path path) { return fs::exists(path); }
 
-    template <typename T>
-    future<std::shared_ptr<T>> load_from_uri(const uri &uri) {
+    template <typename res,
+              typename = std::enable_if_t<std::is_base_of_v<Resource, res>>>
+    future<std::shared_ptr<res>> load(const uri &uri) {
         return this->_async_task->do_async<
-            std::shared_ptr<T>>([this, &uri](auto promise) {
+            std::shared_ptr<res>>([this, &uri](auto promise) {
             {
                 std::shared_lock<std::shared_mutex> l_lock(this->_lock);
                 auto cache = this->_search_cache(uri.encoded_url().to_string());
@@ -92,12 +51,12 @@ class ResourceMgr {
                     GLOG_D("load resource %s",
                            uri.encoded_url().to_string().c_str());
                     promise->set_value(
-                        std::dynamic_pointer_cast<T>(cache.value()->second));
+                        std::dynamic_pointer_cast<res>(cache.value()->second));
                     return;
                 }
             }
 
-            std::shared_ptr<T> ptr;
+            std::shared_ptr<res> ptr;
 
             {
                 fs::path path{uri.encoded_path().to_string()};
@@ -107,11 +66,12 @@ class ResourceMgr {
                     // TODO: "path" to var
                     const auto query_path = uri.params().at("path");
                     path = uri.encoded_url().to_string();
+                    auto archive_file = archive.value()->extract(query_path);
                     // from stream read
-                    ptr = std::make_shared<T>(
-                        path, archive.value()->extract(query_path));
+                    ptr = ResourceProvice<res>::load(ResourceStreamInfo{
+                        path, archive_file.org_size, archive_file.is});
                 } else {
-                    ptr = std::make_shared<T>(path);
+                    ptr = ResourceProvice<res>::load(path);
                 }
             }
 
@@ -125,9 +85,10 @@ class ResourceMgr {
         });
     }
 
-    template <typename T>
-    future<std::shared_ptr<T>> load_from_path(const std::string &path) {
-        return this->_async_task->do_async<std::shared_ptr<T>>(
+    template <typename res,
+              typename = std::enable_if_t<std::is_base_of_v<Resource, res>>>
+    future<std::shared_ptr<res>> load(const std::string &path) {
+        return this->_async_task->do_async<std::shared_ptr<res>>(
             [this, &path](auto promise) {
                 auto full_path = fs::absolute(path);
                 {
@@ -135,13 +96,13 @@ class ResourceMgr {
                     auto cache = this->_search_cache(full_path);
 
                     if (cache.has_value()) {
-                        promise->set_value(std::dynamic_pointer_cast<T>(
+                        promise->set_value(std::dynamic_pointer_cast<res>(
                             cache.value()->second));
                         return;
                     }
                 }
                 GLOG_D("load resource %s", full_path.c_str());
-                auto ptr = std::make_shared<T>(full_path);
+                auto ptr = ResourceProvice<res>::load(full_path);
                 promise->set_value(ptr);
 
                 {

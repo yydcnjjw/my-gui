@@ -247,7 +247,7 @@ class XP3Archive : public my::Archive {
         std::shared_ptr<boost::iostreams::filtering_istream> _stream;
     };
 
-    std::shared_ptr<std::istream> extract(const my::fs::path &path) override {
+    my::ArchiveFile extract(const my::fs::path &path) override {
         if (!path.is_relative()) {
             throw std::runtime_error(
                 (boost::format("xp3 archive: path format error %1%") % path)
@@ -259,9 +259,12 @@ class XP3Archive : public my::Archive {
             throw std::runtime_error(
                 (boost::format("xp3 archive: %1% is not exist") % path).str());
         }
+        auto info = it->second;
 
-        return std::make_shared<boost::iostreams::stream<XP3Source>>(
-            this->_archive_path, it->second);
+        return my::ArchiveFile{
+            info->path, info->arc_size, info->org_size,
+            std::make_unique<boost::iostreams::stream<XP3Source>>(
+                this->_archive_path, it->second)};
     }
 
   private:

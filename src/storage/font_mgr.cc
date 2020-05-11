@@ -69,6 +69,7 @@ class MyFont : public my::Font {
   public:
     MyFont(FT_Library ft_lib, const std::string &path) : _font_size(24) {
         FT_Error e = ::FT_New_Face(ft_lib, path.c_str(), 0, &this->_ft_face);
+        FT_Open_Face(FT_Library library, const FT_Open_Args *args, FT_Long face_index, FT_Face *aface)
         if (e) {
             throw std::runtime_error(FT_Error_String(e));
         }

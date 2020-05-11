@@ -14,5 +14,5 @@ using Size2D = SkSize;
 
 using Canvas = SkCanvas;
 using Bitmap = SkBitmap;
-
+using ImageInfo = SkImageInfo;
 } // namespace my
