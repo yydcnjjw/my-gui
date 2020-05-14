@@ -7,18 +7,21 @@
 #include <boost/format.hpp>
 #include <boost/gil.hpp>
 #include <glm/glm.hpp>
+#include <my_gui.hpp>
 #include <render/window/window_mgr.h>
-#include <storage/font_mgr.h>
-#include <storage/resource_mgr.hpp>
-#include <util/event_bus.hpp>
-#include <util/logger.h>
+#include <storage/resource.hpp>
 
 namespace my {
-typedef LLGL::RenderSystem RenderSystem;
-typedef glm::u8vec4 ColorRGBAub;
-typedef boost::gil::rgba8_image_t RGBAImage;
 
-    
+// class Canvas {
+//   public:
+//     static std::shared_ptr<Canvas> make() {
+        
+//     }
+
+//   private:
+// };
+
 class RectOutRangeError : public std::range_error {
   public:
     explicit RectOutRangeError(const std::string &msg) throw()
@@ -62,7 +65,6 @@ struct DrawVert {
     ColorRGBAub col{255, 255, 255, 255};
 };
 
-class Canvas;
 class DrawPath {
   public:
     friend class Canvas;
@@ -176,8 +178,7 @@ class Canvas {
     std::shared_ptr<RGBAImage> get_image_data(const Point2D &offset,
                                               const Size2D &size);
 
-    void put_image_data(std::shared_ptr<RGBAImage> data,
-                        const Point2D &offset);
+    void put_image_data(std::shared_ptr<RGBAImage> data, const Point2D &offset);
 
     void render();
 

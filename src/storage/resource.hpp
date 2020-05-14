@@ -5,17 +5,13 @@
 #include <typeinfo>
 
 #include <boost/noncopyable.hpp>
-#include <boost/url/url.hpp>
 
-#include <my_gui.h>
+#include <my_gui.hpp>
 #include <util/uuid.hpp>
 
 namespace my {
 
-namespace fs = std::filesystem;
-using uri = boost::urls::url;
-
-class Resource : boost::noncopyable {
+class Resource : private boost::noncopyable {
   public:
     explicit Resource() {}
     virtual ~Resource() = default;
@@ -30,21 +26,12 @@ class Resource : boost::noncopyable {
     const uuid _uuid{uuid_gen()};
 };
 
-std::unique_ptr<std::ifstream> make_ifstream(const fs::path &path) {
-    auto ifs = std::make_unique<std::ifstream>();
-    ifs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ifs->open(path);
-    return ifs;
-}
-std::unique_ptr<std::ofstream> make_ofstream(const fs::path &path) {
-    auto ofs = std::make_unique<std::ofstream>();
-    ofs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ofs->open(path);
-    return ofs;
-}
+std::unique_ptr<std::ifstream> make_ifstream(const fs::path &path);
+
+std::unique_ptr<std::ofstream> make_ofstream(const fs::path &path);
 
 struct ResourceStreamInfo {
-    uri uri{};
+    my::uri uri{};
     /**
      * only hint
      */
@@ -60,8 +47,6 @@ struct ResourceStreamInfo {
 template <typename res,
           typename = std::enable_if_t<std::is_base_of_v<Resource, res>>>
 class ResourceProvider {
-    static std::type_index type() { return typeid(res); }
-
     /**
      * @brief      load from fs
      */
@@ -74,7 +59,7 @@ class ResourceProvider {
      */
     static std::shared_ptr<res> load(const ResourceStreamInfo &) {
         throw std::invalid_argument((boost::format("%1% can not be load") %
-                                     ResourceProvider<res>::type().anme)
+                                     ResourceProvider<res>::type().name)
                                         .str());
     }
 };

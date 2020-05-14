@@ -18,13 +18,15 @@ set(my-gui_src
   util/async_task.cc
   util/event_bus.cc
   util/logger.cc
-  storage/resource_mgr.cc  
+  util/uuid.cc
+  storage/resource_mgr.cc
+  storage/resource.cc
   storage/archive.cc
   storage/xp3_archive.cc
-  storage/font_mgr.cc
+  # storage/font_mgr.cc
   render/window/window_mgr.cc
-  render/canvas.cc
-  media/audio_mgr.cc
+  # render/canvas.cc
+  # media/audio_mgr.cc
   )
 
 # system
@@ -35,10 +37,13 @@ find_package(Boost REQUIRED COMPONENTS
   thread program_options iostreams locale timer coroutine)
 find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
+find_package(Fontconfig REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
+find_package(webp REQUIRED)
 find_package(cairo REQUIRED)
+find_package(OpenGL REQUIRED)
 
 # build
 find_package(glm CONFIG REQUIRED)
@@ -57,10 +62,14 @@ set(DEPS
   Threads::Threads
   ${CMAKE_DL_LIBS}
   SDL2::SDL2
+  OpenGL::OpenGL
+  OpenGL::GLX
   ${SDL2Mixer_LIBRARIES}
   # ${cairo_LIBRARIES}
   ${FFMPEG_LIBRARIES}
+  ${webp_LIBRARIES}
   Freetype::Freetype
+  Fontconfig::Fontconfig
   Vulkan::Vulkan
   PNG::PNG
   JPEG::JPEG

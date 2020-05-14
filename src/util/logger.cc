@@ -7,7 +7,7 @@
 #include <future>
 #include <iostream>
 
-#include <my_gui.h>
+#include <my_gui.hpp>
 
 namespace {
 class StdLoggerOutput : public Logger::LoggerOutput {

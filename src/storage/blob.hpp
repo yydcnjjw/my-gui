@@ -15,7 +15,8 @@ class Blob : public Resource {
     std::unique_ptr<std::istream> stream() {
         return std::make_unique<
             boost::iostreams::stream<boost::iostreams::array_source>>(
-            this->_blob_data.data(), this->_blob_data.size());
+            reinterpret_cast<const char *>(this->_blob_data.data()),
+            this->_blob_data.size());
     }
 
     /**
@@ -36,23 +37,31 @@ class Blob : public Resource {
             this->_blob_data.size());
     }
 
+    size_t size() { return this->_blob_data.size(); }
+
+    const uint8_t *data() { return this->_blob_data.data(); }
+
+    static std::shared_ptr<Blob> make(const ResourceStreamInfo &info) {
+        return std::shared_ptr<Blob>{new Blob(info)};
+    }
+
   protected:
-    std::vector<uint8_t> _blob_data;
     Blob(const ResourceStreamInfo &info) {
-        this->_blob_data.reserve(info.size);
-        this->_blob_data.assign(std::istream_iterator<uint8_t>(*info.is),
-                                std::istream_iterator<uint8_t>());
+        this->_blob_data.assign(info.size, 0);
+        auto read_size = info.is->readsome(
+            reinterpret_cast<char *>(this->_blob_data.data()), info.size);
+        assert(static_cast<std::streamsize>(info.size) == read_size);
     }
 
   private:
-    static std::shared_ptr<Blob> make(const ResourceStreamInfo &info) {
-        return std::make_shared<Blob>(info);
-    }
-    friend class ResourceProvider<Blob>;
+    std::vector<uint8_t> _blob_data;
 };
 
 template <> class ResourceProvider<Blob> {
   public:
+    static std::shared_ptr<Blob> load(const fs::path &path) {
+        return ResourceProvider<Blob>::load(ResourceStreamInfo::make(path));
+    }
     static std::shared_ptr<Blob> load(const ResourceStreamInfo &info) {
         return Blob::make(info);
     }

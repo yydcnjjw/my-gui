@@ -10,7 +10,7 @@
 // #include <glm/glm.hpp>
 // #include <glm/gtc/matrix_transform.hpp>
 // #include <glm/gtx/hash.hpp>
-#include <my_gui.h>
+#include <my_gui.hpp>
 #include <storage/resource_mgr.hpp>
 
 #define VERTEX_BINDING_ID 0

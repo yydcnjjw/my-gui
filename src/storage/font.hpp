@@ -1,6 +1,7 @@
 #pragma once
 
 #include <my_render.h>
+#include <storage/blob.hpp>
 #include <storage/resource.hpp>
 
 #include <ft2build.h>
@@ -9,32 +10,40 @@
 
 namespace my {
 
-class Font : public Resource {
+class Font : public Blob {
   public:
-    ~Font() {
-        ::FT_Done_Face(this->_face);
+    ~Font() { // ::FT_Done_Face(this->_face);
     }
     virtual size_t used_mem() override { return 0; }
 
-    static std::shared_ptr<Font> make(FT_Face face) {
-        return std::make_shared<Font>(face);
+    sk_sp<SkTypeface> get_sk_typeface() {
+        assert(this->_sk_typeface);
+        return this->_sk_typeface;
+    }
+
+    static std::shared_ptr<Font> make(const ResourceStreamInfo &info) {
+        return std::shared_ptr<Font>(new Font(info));
     }
 
   private:
-    FT_Face _face;
-    Font(FT_Face face) : _face(face) {
-        SkFontMgr::RefDefault()->makeFromData(nullptr);
-    }
+    sk_sp<SkTypeface> _sk_typeface{};
+
+    Font(const ResourceStreamInfo &info)
+        : Blob(info),
+          _sk_typeface(SkTypeface::MakeFromData(
+              SkData::MakeWithoutCopy(this->data(), this->size()))) {}
 };
 
 template <> class ResourceProvider<Font> {
   public:
+    ~ResourceProvider<Font>() { ::FT_Done_FreeType(this->_ft_lib); }
+
     static std::shared_ptr<Font> load(const fs::path &path) {
-        return ResourceProvider<Font>::get()._load(path);
+        return ResourceProvider<Font>::load(ResourceStreamInfo::make(path));
     }
 
     static std::shared_ptr<Font> load(const ResourceStreamInfo &info) {
-        return ResourceProvider<Font>::get()._load(info);
+        return Font::make(info);
     }
 
   private:
@@ -60,23 +69,15 @@ template <> class ResourceProvider<Font> {
 
     static void ft_close(FT_Stream) {}
 
-    std::shared_ptr<Font> _load(const fs::path &path) {
-        FT_Face face;
-        auto e = ::FT_New_Face(this->_ft_lib, path.c_str(), 0, &face);
-        if (e) {
-            throw std::runtime_error(FT_Error_String(e));
-        }
-        return Font::make(face);
-    }
-
-    std::shared_ptr<Font> _load(const ResourceStreamInfo &info) {
+    static FT_Face open_face(std::shared_ptr<Font> font, int index) {
+        auto is = font->stream();
         FT_StreamDesc desc;
-        { desc.pointer = info.is.get(); }
+        { desc.pointer = is.get(); }
 
         auto stream = std::make_shared<FT_StreamRec>();
         {
             stream->base = 0;
-            stream->size = info.size;
+            stream->size = font->size();
             stream->descriptor = desc;
             stream->read = &ft_read;
             stream->close = &ft_close;
@@ -88,12 +89,14 @@ template <> class ResourceProvider<Font> {
             args.stream = stream.get();
         }
         FT_Face face;
-        auto e = ::FT_Open_Face(this->_ft_lib, &args, 0, &face);
+
+        auto e = ::FT_Open_Face(ResourceProvider<Font>::get()._ft_lib, &args,
+                                index, &face);
         if (e) {
             throw std::runtime_error(FT_Error_String(e));
         }
 
-        return Font::make(face);
+        return face;
     }
 };
 

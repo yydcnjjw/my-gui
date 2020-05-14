@@ -1,10 +1,9 @@
 #pragma once
 
-#include <media/audio_mgr.h>
-#include <my_gui.h>
+#include <my_gui.hpp>
+// #include <media/audio_mgr.h>
 #include <render/window/window_mgr.h>
-#include <render/canvas.h>
-#include <storage/font_mgr.h>
+// #include <storage/font_mgr.h>
 #include <storage/resource_mgr.hpp>
 #include <util/async_task.hpp>
 #include <util/event_bus.hpp>
@@ -21,12 +20,10 @@ class Application {
 
     virtual EventBus *ev_bus() const = 0;
     virtual WindowMgr *win_mgr() const = 0;
-    virtual FontMgr *font_mgr() const = 0;
     virtual AsyncTask *async_task() const = 0;
     virtual ResourceMgr *resource_mgr() const = 0;
-    virtual AudioMgr *audio_mgr() const = 0;
     virtual LLGL::RenderSystem *renderer() const = 0;
-    virtual std::shared_ptr<Canvas> make_canvas(Window *) = 0;
+    
     virtual bool
     get_program_option(const std::string &option,
                        program_options::variable_value &value) const = 0;

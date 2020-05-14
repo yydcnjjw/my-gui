@@ -1,11 +1,11 @@
 #pragma once
-#include <my_render.h>
 
 #include <LLGL/LLGL.h>
 #include <LLGL/Platform/NativeHandle.h>
-#include <util/event_bus.hpp>
 
+#include <util/event_bus.hpp>
 #include <render/window/event.h>
+#include <my_render.h>
 
 namespace my {
 using WindowID = uint32_t;
@@ -15,6 +15,8 @@ class Window {
     virtual ~Window() = default;
 
     virtual std::shared_ptr<LLGL::Surface> get_surface() = 0;
+    virtual sk_sp<my::Surface> get_2d_surface() = 0;
+    virtual void swap_window() = 0;
     virtual WindowID get_window_id() = 0;
     virtual void hide() = 0;
     virtual void show() = 0;

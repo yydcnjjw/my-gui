@@ -1,7 +1,6 @@
 #include "archive.h"
 
 #include <cstring>
-#include <fstream>
 #include <locale>
 
 #include <boost/format.hpp>
@@ -10,8 +9,8 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/stream.hpp>
 
-#include <util/codecvt.h>
-#include <util/logger.h>
+#include <my_gui.hpp>
+#include <storage/resource.hpp>
 
 namespace {
 
@@ -176,14 +175,7 @@ class XP3Archive : public my::Archive {
         XP3Source(const my::fs::path &archive_path,
                   const std::shared_ptr<XP3ArchiveFileInfo> &file_info)
             : _archive_path(archive_path), _file_info(file_info) {
-
-            for (auto &segm : file_info->segms) {
-                GLOG_D("%d %d %d", segm.start, segm.org_size, segm.arc_size);
-            }
-            this->_archive = std::make_shared<std::ifstream>();
-            this->_archive->exceptions(std::ifstream::failbit |
-                                       std::ifstream::badbit);
-            this->_archive->open(archive_path, std::ios::binary);
+            this->_archive = my::make_ifstream(archive_path);
 
             this->_current_segm = this->_file_info->segms.begin();
             init_current_segm();

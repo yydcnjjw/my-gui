@@ -1,9 +1,14 @@
 #include "window_mgr.h"
 
+#include <skia/include/gpu/GrBackendSurface.h>
+#include <skia/include/gpu/GrContext.h>
+#include <skia/include/gpu/gl/GrGLInterface.h>
+
+#include <GL/gl.h>
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
 #include <SDL2/SDL_vulkan.h>
-#include <util/logger.h>
 
 namespace {
 
@@ -53,13 +58,24 @@ class SDLWindow : public my::Window {
 
     SDLWindow(SDL_Window *win)
         : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)),
-          _surface(std::make_shared<SDLSurface>(this)) {}
+          _surface(std::make_shared<SDLSurface>(this)),
+          _2d_surface(make_2d_surface(win)) {}
 
-    ~SDLWindow() { SDL_DestroyWindow(this->_sdl_window); }
+    ~SDLWindow() {
+        if (this->_gl_context) {
+            ::SDL_GL_DeleteContext(this->_gl_context);
+        }
+
+        ::SDL_DestroyWindow(this->_sdl_window);
+    }
 
     std::shared_ptr<LLGL::Surface> get_surface() override {
         return this->_surface;
     };
+
+    sk_sp<my::Surface> get_2d_surface() override { return this->_2d_surface; }
+
+    void swap_window() override { SDL_GL_SwapWindow(this->_sdl_window); }
 
     my::ISize2D get_frame_buffer_size() override {
         // TODO: gl vulkan
@@ -142,10 +158,87 @@ class SDLWindow : public my::Window {
         SDL_WarpMouseInWindow(this->_sdl_window, pos.x(), pos.y());
     }
 
+  private:
     SDL_Window *_sdl_window;
-    my::WindowID _win_id;
-    std::shared_ptr<SDLSurface> _surface;
+    my::WindowID _win_id{};
+    std::shared_ptr<SDLSurface> _surface{};
+    sk_sp<my::Surface> _2d_surface{};
     bool _is_visible{true};
+
+    SDL_GLContext _gl_context;
+
+    sk_sp<my::Surface> make_2d_surface(SDL_Window *window) {
+        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                              SDL_GL_CONTEXT_PROFILE_CORE);
+
+        static const int stencil_bits{8}; // Skia needs 8 stencil bits
+        ::SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+        ::SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+        ::SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+        ::SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        ::SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+        ::SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil_bits);
+
+        ::SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+
+        // If you want multisampling, uncomment the below lines and set a sample
+        // count
+        static const int msaa_sample_count{0}; // 4;
+        // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+        // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, kMsaaSampleCount);
+
+        this->_gl_context = ::SDL_GL_CreateContext(window);
+        if (!this->_gl_context) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
+        auto success = ::SDL_GL_MakeCurrent(window, this->_gl_context);
+        if (success != 0) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
+        int w{}, h{};
+        ::SDL_GL_GetDrawableSize(window, &w, &h);
+
+        ::glViewport(0, 0, w, h);
+        ::glClearColor(1, 1, 1, 1);
+        ::glClearStencil(0);
+        ::glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        // setup GrContext
+        auto interface = GrGLMakeNativeInterface();
+
+        // setup contexts
+        sk_sp<GrContext> gr_context{GrContext::MakeGL(interface)};
+
+        GrGLFramebufferInfo info{};
+        {
+            GLint fbo{};
+            ::glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
+            if (::glGetError() != GL_NO_ERROR) {
+                throw std::runtime_error("framebuffer binding error");
+            }
+            info.fFBOID = fbo;
+            info.fFormat = GL_RGBA8;
+        }
+
+        SkColorType color_type{kRGBA_8888_SkColorType};
+
+        GrBackendRenderTarget target{w, h, msaa_sample_count, stencil_bits,
+                                     info};
+
+        // setup SkSurface
+        // To use distance field text, use commented out SkSurfaceProps instead
+        // SkSurfaceProps props(SkSurfaceProps::kUseDeviceIndependentFonts_Flag,
+        //                      SkSurfaceProps::kLegacyFontHost_InitType);
+        SkSurfaceProps props{SkSurfaceProps::kLegacyFontHost_InitType};
+
+        return SkSurface::MakeFromBackendRenderTarget(
+            gr_context.get(), target, kBottomLeft_GrSurfaceOrigin, color_type,
+            nullptr, &props);
+    }
 };
 
 class SDLWindowMgr : public my::WindowMgr {
@@ -225,11 +318,12 @@ class SDLWindowMgr : public my::WindowMgr {
     my::Window *create_window(const std::string &title, uint32_t w,
                               uint32_t h) override {
         // TODO: 考虑 继承
-        SDL_Window *sdl_win = SDL_CreateWindow(
-            title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w,
-            h,
-            SDL_WINDOW_VULKAN | SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI |
-                SDL_WINDOW_RESIZABLE);
+        SDL_Window *sdl_win =
+            SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED,
+                             SDL_WINDOWPOS_UNDEFINED, w, h,
+                             // SDL_WINDOW_VULKAN |
+                             SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI |
+                                 SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
 
         if (sdl_win == nullptr) {
             throw std::runtime_error(SDL_GetError());
