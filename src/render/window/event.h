@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SDL2/SDL.h>
-#include <my_render.h>
+#include <my_render.hpp>
 
 namespace my {
 using WindowID = uint32_t;

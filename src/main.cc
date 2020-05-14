@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
     audio->play();
     audio2->play();
 
-    auto surface = win->get_2d_surface();
+    auto surface = win->get_sk_surface();
     auto canvas = surface->getCanvas();
 
     struct Paint {};

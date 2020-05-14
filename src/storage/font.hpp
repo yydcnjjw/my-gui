@@ -1,6 +1,6 @@
 #pragma once
 
-#include <my_render.h>
+#include <my_render.hpp>
 #include <storage/blob.hpp>
 #include <storage/resource.hpp>
 
@@ -22,16 +22,16 @@ class Font : public Blob {
     }
 
     static std::shared_ptr<Font> make(const ResourceStreamInfo &info) {
-        return std::shared_ptr<Font>(new Font(info));
+        return std::make_shared<Font>(info);
     }
-
-  private:
-    sk_sp<SkTypeface> _sk_typeface{};
 
     Font(const ResourceStreamInfo &info)
         : Blob(info),
           _sk_typeface(SkTypeface::MakeFromData(
               SkData::MakeWithoutCopy(this->data(), this->size()))) {}
+
+  private:
+    sk_sp<SkTypeface> _sk_typeface{};
 };
 
 template <> class ResourceProvider<Font> {

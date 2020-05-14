@@ -59,7 +59,7 @@ class SDLWindow : public my::Window {
     SDLWindow(SDL_Window *win)
         : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)),
           _surface(std::make_shared<SDLSurface>(this)),
-          _2d_surface(make_2d_surface(win)) {}
+          _sk_surface(make_sk_surface(win)) {}
 
     ~SDLWindow() {
         if (this->_gl_context) {
@@ -73,7 +73,7 @@ class SDLWindow : public my::Window {
         return this->_surface;
     };
 
-    sk_sp<my::Surface> get_2d_surface() override { return this->_2d_surface; }
+    sk_sp<SkSurface> get_sk_surface() override { return this->_sk_surface; }
 
     void swap_window() override { SDL_GL_SwapWindow(this->_sdl_window); }
 
@@ -162,12 +162,12 @@ class SDLWindow : public my::Window {
     SDL_Window *_sdl_window;
     my::WindowID _win_id{};
     std::shared_ptr<SDLSurface> _surface{};
-    sk_sp<my::Surface> _2d_surface{};
+    sk_sp<SkSurface> _sk_surface{};
     bool _is_visible{true};
 
     SDL_GLContext _gl_context;
 
-    sk_sp<my::Surface> make_2d_surface(SDL_Window *window) {
+    sk_sp<SkSurface> make_sk_surface(SDL_Window *window) {
         ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
         ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,

@@ -3,7 +3,7 @@
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <my_render.h>
+#include <my_render.hpp>
 #include <storage/resource.hpp>
 
 namespace my {

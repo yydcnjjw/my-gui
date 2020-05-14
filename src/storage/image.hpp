@@ -6,7 +6,7 @@
 #include <boost/gil/extension/io/png.hpp>
 #include <boost/gil/io/read_image.hpp>
 
-#include <my_render.h>
+#include <my_render.hpp>
 #include <storage/resource.hpp>
 
 namespace my {
@@ -31,9 +31,10 @@ class Image : public Resource {
         return std::make_shared<Image>(gil_image);
     }
 
+    Image(std::shared_ptr<image_type> gil_image) : _image(gil_image) {}
+
   private:
     std::shared_ptr<image_type> _image;
-    Image(std::shared_ptr<image_type> gil_image) : _image(gil_image) {}
 };
 
 class ImageView {};
