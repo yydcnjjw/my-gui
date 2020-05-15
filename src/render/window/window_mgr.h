@@ -48,8 +48,6 @@ class WindowMgr {
   public:
     virtual ~WindowMgr() = default;
 
-    // TODO: 考虑使用 window mgr 管理 window
-    // return Window * 而不是 std::shared_ptr
     virtual Window *create_window(const std::string &title, uint32_t w,
                                   uint32_t h) = 0;
     virtual void remove_window(Window *) = 0;

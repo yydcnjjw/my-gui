@@ -46,7 +46,7 @@ template <> class ResourceProvider<Image> {
     }
     static std::shared_ptr<Image> load(ResourceStreamInfo info) {
         auto &is = info.is;
-        auto uri = info.uri;
+        auto &uri = info.uri;
 
         auto path = fs::path(uri.encoded_path().to_string());
 

@@ -38,7 +38,7 @@ struct MouseState {
     IPoint2D pos;
     MouseState(uint32_t mask, IPoint2D pos) : mask(mask), pos(pos) {}
 };
-    
+
 struct MouseMotionEvent {
     WindowID win_id;
     IPoint2D pos;
@@ -82,11 +82,11 @@ struct MouseButtonEvent {
         : win_id(win_id), which(which), button(button), state(state),
           clicks(clicks), pos(pos) {}
 };
- 
+
 struct WindowEvent {
     WindowID win_id;
     uint8_t event;
     WindowEvent(WindowID win_id, uint8_t event)
         : win_id(win_id), event(event) {}
 };
-}
+} // namespace my

@@ -64,7 +64,7 @@ class ResourceMgr {
                     auto archive_file = archive.value()->extract(query_path);
                     // from stream read
                     resource = ResourceProvider<res>::load(ResourceStreamInfo{
-                        my::uri(uri.encoded_url()), archive_file.org_size,
+                        my::uri(query_path), archive_file.org_size,
                         std::move(archive_file.is)});
                 } else {
                     resource = ResourceProvider<res>::load(path);
@@ -91,7 +91,8 @@ class ResourceMgr {
                     return;
                 }
 
-                GLOG_D("load resource %s", uri.encoded_url().to_string().c_str());
+                GLOG_D("load resource %s",
+                       uri.encoded_url().to_string().c_str());
                 auto resource = ResourceProvider<res>::load(
                     fs::path(uri.encoded_path().to_string()));
                 promise->set_value(resource);

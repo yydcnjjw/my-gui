@@ -176,7 +176,12 @@ template <> class ResourceProvider<Audio> {
      * @brief      load from stream
      */
     static std::shared_ptr<Audio> load(const ResourceStreamInfo &info) {
-        fs::path path{std::tmpnam(nullptr)};
+        char buf[] = "my_gui_XXXXXX";
+        if (mkstemp(buf) == -1) {
+            throw std::runtime_error(std::strerror(errno));
+        }
+        
+        fs::path path{buf};
 
         boost::iostreams::copy(*info.is, *make_ofstream(path));
 

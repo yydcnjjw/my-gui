@@ -10,9 +10,8 @@
 #include <skia/include/core/SkFontMgr.h>
 #include <skia/include/core/SkTypeface.h>
 #include <storage/font.hpp>
+#include <storage/image.hpp>
 #include <storage/resource_mgr.hpp>
-
-#include <fstream>
 
 int main(int argc, char *argv[]) {
     auto app = my::new_application(argc, argv, {});
@@ -43,6 +42,8 @@ int main(int argc, char *argv[]) {
                       .get();
     audio->play();
     audio2->play();
+
+    auto test_image = resource_mgr->load<my::Image>(my::make_archive_search_uri("data.xp3", "image/sysbt_bt_auto_3mode.png"))
 
     auto surface = win->get_sk_surface();
     auto canvas = surface->getCanvas();

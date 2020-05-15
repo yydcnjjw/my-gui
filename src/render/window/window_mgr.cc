@@ -11,7 +11,8 @@
 #include <SDL2/SDL_vulkan.h>
 
 namespace {
-
+static const int stencil_bits{8};      // Skia needs 8 stencil bits
+static const int msaa_sample_count{0}; // 4;
 class SDLWindow : public my::Window {
   public:
     class SDLSurface : public LLGL::Surface {
@@ -57,9 +58,11 @@ class SDLWindow : public my::Window {
     };
 
     SDLWindow(SDL_Window *win)
-        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)),
-          _surface(std::make_shared<SDLSurface>(this)),
-          _sk_surface(make_sk_surface(win)) {}
+        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window))
+    // ,_surface(std::make_shared<SDLSurface>(this))
+    {
+        this->_build_gl_context(this->_sdl_window);
+    }
 
     ~SDLWindow() {
         if (this->_gl_context) {
@@ -73,14 +76,22 @@ class SDLWindow : public my::Window {
         return this->_surface;
     };
 
-    sk_sp<SkSurface> get_sk_surface() override { return this->_sk_surface; }
+    sk_sp<SkSurface> get_sk_surface() override {
+        auto [w, h] = this->get_frame_buffer_size();
+        if (!this->_sk_surface || this->_sk_surface->width() != w ||
+            this->_sk_surface->height() != h) {
+            this->_sk_surface = this->_make_sk_surface();
+        }
+        return this->_sk_surface;
+    }
 
     void swap_window() override { SDL_GL_SwapWindow(this->_sdl_window); }
 
     my::ISize2D get_frame_buffer_size() override {
         // TODO: gl vulkan
         int w, h;
-        SDL_Vulkan_GetDrawableSize(this->_sdl_window, &w, &h);
+        // SDL_Vulkan_GetDrawableSize(this->_sdl_window, &w, &h);
+        ::SDL_GL_GetDrawableSize(this->_sdl_window, &w, &h);
         return my::ISize2D::Make(w, h);
     }
 
@@ -90,45 +101,45 @@ class SDLWindow : public my::Window {
 
     my::ISize2D get_min_size() override {
         int w, h;
-        SDL_GetWindowMinimumSize(this->_sdl_window, &w, &h);
+        ::SDL_GetWindowMinimumSize(this->_sdl_window, &w, &h);
         return my::ISize2D::Make(w, h);
     }
     my::ISize2D get_max_size() override {
         int w, h;
-        SDL_GetWindowMaximumSize(this->_sdl_window, &w, &h);
+        ::SDL_GetWindowMaximumSize(this->_sdl_window, &w, &h);
         return my::ISize2D::Make(w, h);
     }
 
     void set_min_size(const my::ISize2D &size) override {
-        SDL_SetWindowMinimumSize(this->_sdl_window, size.width(),
-                                 size.height());
+        ::SDL_SetWindowMinimumSize(this->_sdl_window, size.width(),
+                                   size.height());
     }
     void set_max_size(const my::ISize2D &size) override {
-        SDL_SetWindowMaximumSize(this->_sdl_window, size.width(),
-                                 size.height());
+        ::SDL_SetWindowMaximumSize(this->_sdl_window, size.width(),
+                                   size.height());
     }
 
     my::ISize2D get_size() override {
         int w, h;
-        SDL_GetWindowSize(this->_sdl_window, &w, &h);
+        ::SDL_GetWindowSize(this->_sdl_window, &w, &h);
         return my::ISize2D::Make(w, h);
     }
 
     void set_size(const my::ISize2D &size) override {
-        SDL_SetWindowSize(this->_sdl_window, size.width(), size.height());
+        ::SDL_SetWindowSize(this->_sdl_window, size.width(), size.height());
     }
     my::IPoint2D get_pos() override {
         int x, y;
-        SDL_GetWindowPosition(this->_sdl_window, &x, &y);
+        ::SDL_GetWindowPosition(this->_sdl_window, &x, &y);
         return {x, y};
     }
     void set_pos(const my::IPoint2D &pos) override {
-        SDL_SetWindowPosition(this->_sdl_window, pos.x(), pos.y());
+        ::SDL_SetWindowPosition(this->_sdl_window, pos.x(), pos.y());
     }
 
     virtual void set_full_screen(bool full_screen) override {
-        SDL_SetWindowFullscreen(this->_sdl_window,
-                                full_screen ? SDL_WINDOW_FULLSCREEN : 0);
+        ::SDL_SetWindowFullscreen(this->_sdl_window,
+                                  full_screen ? SDL_WINDOW_FULLSCREEN : 0);
     }
 
     my::WindowID get_window_id() override { return this->_win_id; }
@@ -141,9 +152,9 @@ class SDLWindow : public my::Window {
             return;
         }
         if (visible) {
-            SDL_ShowWindow(this->_sdl_window);
+            ::SDL_ShowWindow(this->_sdl_window);
         } else {
-            SDL_HideWindow(this->_sdl_window);
+            ::SDL_HideWindow(this->_sdl_window);
         }
         this->_is_visible = visible;
     }
@@ -151,11 +162,11 @@ class SDLWindow : public my::Window {
     bool is_visible() override { return this->_is_visible; }
 
     void show_cursor(bool toggle) override {
-        SDL_ShowCursor(toggle ? SDL_ENABLE : SDL_DISABLE);
+        ::SDL_ShowCursor(toggle ? SDL_ENABLE : SDL_DISABLE);
     }
 
     void set_mouse_pos(const my::IPoint2D &pos) override {
-        SDL_WarpMouseInWindow(this->_sdl_window, pos.x(), pos.y());
+        ::SDL_WarpMouseInWindow(this->_sdl_window, pos.x(), pos.y());
     }
 
   private:
@@ -167,28 +178,7 @@ class SDLWindow : public my::Window {
 
     SDL_GLContext _gl_context;
 
-    sk_sp<SkSurface> make_sk_surface(SDL_Window *window) {
-        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
-                              SDL_GL_CONTEXT_PROFILE_CORE);
-
-        static const int stencil_bits{8}; // Skia needs 8 stencil bits
-        ::SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-        ::SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-        ::SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-        ::SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        ::SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
-        ::SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil_bits);
-
-        ::SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-
-        // If you want multisampling, uncomment the below lines and set a sample
-        // count
-        static const int msaa_sample_count{0}; // 4;
-        // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-        // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, kMsaaSampleCount);
-
+    void _build_gl_context(SDL_Window *window) {
         this->_gl_context = ::SDL_GL_CreateContext(window);
         if (!this->_gl_context) {
             throw std::runtime_error(SDL_GetError());
@@ -198,9 +188,10 @@ class SDLWindow : public my::Window {
         if (success != 0) {
             throw std::runtime_error(SDL_GetError());
         }
+    }
 
-        int w{}, h{};
-        ::SDL_GL_GetDrawableSize(window, &w, &h);
+    sk_sp<SkSurface> _make_sk_surface() {
+        auto [w, h] = this->get_frame_buffer_size();
 
         ::glViewport(0, 0, w, h);
         ::glClearColor(1, 1, 1, 1);
@@ -248,7 +239,7 @@ class SDLWindowMgr : public my::WindowMgr {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
-
+        this->_init_gl();
         this->_init_desktop_display_mode();
         bus->on_event<my::QuitEvent>()
             .observe_on(bus->ev_bus_worker())
@@ -370,6 +361,28 @@ class SDLWindowMgr : public my::WindowMgr {
         }
         this->_desktop_display_mode = {
             mode.format, {mode.w, mode.h}, mode.refresh_rate};
+    }
+
+    void _init_gl() {
+        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        ::SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                              SDL_GL_CONTEXT_PROFILE_CORE);
+
+        ::SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+        ::SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+        ::SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+        ::SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        ::SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+
+        ::SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil_bits);
+
+        ::SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+
+        // If you want multisampling, uncomment the below lines and set a sample
+        // count
+        // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+        // SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, kMsaaSampleCount);
     }
 };
 

@@ -48,9 +48,15 @@ class Blob : public Resource {
   protected:
     Blob(const ResourceStreamInfo &info) {
         this->_blob_data.assign(info.size, 0);
-        auto read_size = info.is->readsome(
+        info.is->read(
             reinterpret_cast<char *>(this->_blob_data.data()), info.size);
-        assert(static_cast<std::streamsize>(info.size) == read_size);
+        auto read_size = info.is->gcount();
+        if (static_cast<std::streamsize>(info.size) != read_size) {
+            throw std::runtime_error(
+                (boost::format("%1%: size error read: %2%, info: %3%") %
+                 info.uri.encoded_url().to_string() % read_size % info.size)
+                    .str());
+        }
     }
 
   private:
