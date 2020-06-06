@@ -122,8 +122,9 @@ void Logger::_addLogOutputTarget(unsigned long offset,
         .filter([bit](const std::shared_ptr<LogMsg> &msg) {
             return (bit & msg->bitmap).any();
         })
-        .filter([output](const std::shared_ptr<LogMsg> &msg) {
-            return msg->level >= output->limit_level;
+        .filter([output, this](const std::shared_ptr<LogMsg> &msg) {
+            return msg->level >= output->limit_level &&
+                   msg->level >= this->_level;
         })
         .subscribe(
             [output](const std::shared_ptr<LogMsg> &msg) { (*output)(*msg); });

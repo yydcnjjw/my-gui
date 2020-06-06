@@ -32,7 +32,7 @@ class Audio : public Resource {
     }
 
     void play_fade(int ms) {
-        if (!this->is_play()) {
+        if (this->is_play()) {
             return;
         }
 
@@ -51,7 +51,7 @@ class Audio : public Resource {
     }
 
     bool is_paused() {
-        if (!is_play()) {
+        if (!this->is_play()) {
             GLOG_W("audio is not playing");
             return true;
         }
@@ -168,8 +168,8 @@ template <> class ResourceProvider<Audio> {
     /**
      * @brief      load from fs
      */
-    static std::shared_ptr<Audio> load(const fs::path &path) {
-        return ResourceProvider<Audio>::get()._load(path);
+    static std::shared_ptr<Audio> load(const ResourcePathInfo &info) {
+        return ResourceProvider<Audio>::get()._load(info.path);
     }
 
     /**
@@ -180,12 +180,12 @@ template <> class ResourceProvider<Audio> {
         if (mkstemp(buf) == -1) {
             throw std::runtime_error(std::strerror(errno));
         }
-        
+
         fs::path path{buf};
 
         boost::iostreams::copy(*info.is, *make_ofstream(path));
 
-        auto audio = ResourceProvider<Audio>::load(path);
+        auto audio = ResourceProvider<Audio>::load(ResourcePathInfo{path, 0});
         fs::remove(path);
         return audio;
     }

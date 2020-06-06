@@ -12,9 +12,9 @@
 namespace my {
 
 uri make_archive_search_uri(const my::fs::path &archive_path,
-                            const my::fs::path &query);
+                            const my::fs::path &query, size_t offset = 0);
 
-uri make_path_search_uri(const my::fs::path &file);
+uri make_path_search_uri(const my::fs::path &file, size_t offset = 0);
 
 class ResourceMgr {
   public:
@@ -57,17 +57,27 @@ class ResourceMgr {
                 fs::path path{uri.encoded_path().to_string()};
 
                 auto archive = this->_exist_and_get_archive(path);
+                GLOG_D("uri: %s", uri.encoded_url().to_string().c_str());
 
-                if (archive.has_value()) {
-                    static auto URI_PARAM_PATH = "path";
+                static auto URI_PARAM_OFFSET = "offset";
+                static auto URI_PARAM_PATH = "path";
+
+                size_t offset{0};
+                if (uri.params().find(URI_PARAM_OFFSET) != uri.params().end()) {
+                    offset = std::stoi(uri.params().at(URI_PARAM_OFFSET));
+                }
+
+                if (archive.has_value() &&
+                    uri.params().find(URI_PARAM_PATH) != uri.params().end()) {
                     const auto query_path = uri.params().at(URI_PARAM_PATH);
                     auto archive_file = archive.value()->extract(query_path);
                     // from stream read
                     resource = ResourceProvider<res>::load(ResourceStreamInfo{
                         my::uri(query_path), archive_file.org_size,
-                        std::move(archive_file.is)});
+                        std::move(archive_file.is), offset});
                 } else {
-                    resource = ResourceProvider<res>::load(path);
+                    resource = ResourceProvider<res>::load(
+                        ResourcePathInfo{path, offset});
                 }
 
                 GLOG_D("load resource %s",
@@ -80,7 +90,7 @@ class ResourceMgr {
 
     template <typename res,
               typename = std::enable_if_t<std::is_base_of_v<Resource, res>>>
-    future<std::shared_ptr<res>> load(const std::string &path) {
+    future<std::shared_ptr<res>> load(const fs::path &path) {
         return this->_async_task->do_async<std::shared_ptr<res>>(
             [this, &path](auto promise) {
                 auto uri = make_path_search_uri(path);
@@ -93,8 +103,8 @@ class ResourceMgr {
 
                 GLOG_D("load resource %s",
                        uri.encoded_url().to_string().c_str());
-                auto resource = ResourceProvider<res>::load(
-                    fs::path(uri.encoded_path().to_string()));
+                auto resource = ResourceProvider<res>::load(ResourcePathInfo{
+                    fs::path(uri.encoded_path().to_string()), 0});
                 promise->set_value(resource);
 
                 this->_add_cache(uri, resource);

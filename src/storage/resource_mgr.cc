@@ -5,15 +5,17 @@
 namespace my {
 
 uri make_archive_search_uri(const my::fs::path &archive_path,
-                            const my::fs::path &query) {
-    return my::uri((boost::format("file://%1%?path=%2%") %
-                    fs::absolute(archive_path).string() % query.string())
+                            const my::fs::path &query, size_t offset) {
+    return my::uri((boost::format("file://%1%?path=%2%&offset=%3%") %
+                    fs::absolute(archive_path).string() % query.string() %
+                    offset)
                        .str());
 }
 
-uri make_path_search_uri(const my::fs::path &file) {
-    return my::uri(
-        (boost::format("file://%1%") % fs::absolute(file).string()).str());
+uri make_path_search_uri(const my::fs::path &file, size_t offset) {
+    return my::uri((boost::format("file://%1%?offset=%2%") %
+                    fs::absolute(file).string() % offset)
+                       .str());
 }
 
 // TJS2Script::TJS2Script(const fs::path &path) : Resource(path) {

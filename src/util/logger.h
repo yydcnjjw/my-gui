@@ -8,7 +8,7 @@
 class Logger {
   public:
     enum Level { DEBUG, INFO, WARN, ERROR };
-    typedef std::bitset<32> bitmap;
+    using bitmap = std::bitset<32>;
 
     static const Logger::bitmap logger_all_target;
     struct LogMsg {
@@ -48,10 +48,15 @@ class Logger {
 
     void close();
 
+    void set_level(Level level) {
+        this->_level = level;
+    }
+
   private:
     Logger();
     
     bitmap _bitmap;
+    Level _level{DEBUG};
 
     std::string _buf;
     std::mutex _lock;

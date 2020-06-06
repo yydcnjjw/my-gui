@@ -30,17 +30,30 @@ std::unique_ptr<std::ifstream> make_ifstream(const fs::path &path);
 
 std::unique_ptr<std::ofstream> make_ofstream(const fs::path &path);
 
+struct ResourcePathInfo {
+    fs::path path{};
+
+    size_t offset{0};
+
+    static ResourcePathInfo make(const fs::path &path, size_t offset) {
+        return {path, offset};
+    }
+};
+
 struct ResourceStreamInfo {
     my::uri uri{};
+
     /**
      * only hint
      */
     size_t size{};
     std::unique_ptr<std::istream> is{};
+    size_t offset{0};
 
-    static ResourceStreamInfo make(const fs::path &path) {
-        return ResourceStreamInfo{my::uri(path.string()), fs::file_size(path),
-                                  make_ifstream(path)};
+    static ResourceStreamInfo make(const ResourcePathInfo &info) {
+        return ResourceStreamInfo{my::uri(info.path.string()),
+                                  fs::file_size(info.path),
+                                  make_ifstream(info.path), info.offset};
     }
 };
 
@@ -50,8 +63,10 @@ class ResourceProvider {
     /**
      * @brief      load from fs
      */
-    static std::shared_ptr<res> load(const fs::path &path) {
-        return ResourceProvider<res>::load(ResourceStreamInfo::make(path));
+    static std::shared_ptr<res> load(const ResourcePathInfo &) {
+        throw std::invalid_argument((boost::format("%1% can not be load") %
+                                     ResourceProvider<res>::type().name)
+                                        .str());
     }
 
     /**

@@ -13,7 +13,7 @@
 #include <storage/image.hpp>
 #include <storage/resource_mgr.hpp>
 
-int main(int argc, char *argv[]) {
+void test1(int argc, char *argv[]) {
     auto app = my::new_application(argc, argv, {});
 
     auto ev_bus = app->ev_bus();
@@ -43,7 +43,10 @@ int main(int argc, char *argv[]) {
     audio->play();
     audio2->play();
 
-    auto test_image = resource_mgr->load<my::Image>(my::make_archive_search_uri("data.xp3", "image/sysbt_bt_auto_3mode.png"))
+    auto test_image = resource_mgr
+                          ->load<my::Image>(my::make_archive_search_uri(
+                              "data.xp3", "image/sysbt_bt_auto_3mode.png"))
+                          .get();
 
     auto surface = win->get_sk_surface();
     auto canvas = surface->getCanvas();
@@ -53,7 +56,7 @@ int main(int argc, char *argv[]) {
         [&]() { ev_bus->post<Paint>(); }, std::chrono::milliseconds(1000 / 60));
 
     timer->start();
-    SkPaint paint{};
+
     SkFont font{};
     font.setSize(30);
 
@@ -63,7 +66,19 @@ int main(int argc, char *argv[]) {
 
     auto cpu_surface = SkSurface::MakeRasterN32Premul(400, 400);
     auto cpu_canvas = cpu_surface->getCanvas();
-    cpu_canvas->drawIRect(my::IRect::MakeXYWH(0, 0, 100, 100), paint);
+    {
+        SkPaint paint{};
+        paint.setBlendMode(SkBlendMode::kSrc);
+        paint.setColor(0);
+        // paint.setAlpha(128);
+        cpu_canvas->drawIRect(my::IRect::MakeXYWH(0, 0, 100, 100), paint);
+    }
+    {
+        SkPaint paint{};
+        paint.setColor(0xffffffff);
+        cpu_canvas->drawString("Hello World!", 0, 50, font, paint);
+    }
+
     auto image = cpu_surface->makeImageSnapshot();
 
     ev_bus->on_event<Paint>()
@@ -71,17 +86,15 @@ int main(int argc, char *argv[]) {
         .observe_on(ev_bus->ev_bus_worker())
         .subscribe([&](const auto &) {
             canvas->clear(SK_ColorWHITE);
-            paint.setColor(SK_ColorRED);
+
             canvas->save();
+            {
+                SkPaint paint;
+                paint.setColor(SK_ColorRED);
+                canvas->drawIRect(my::IRect::MakeXYWH(0, 0, 200, 200), paint);
+            }
 
-            canvas->drawIRect(my::IRect::MakeXYWH(0, 0, 400, 400), paint);
-
-            paint.setColor(SK_ColorBLUE);
-            paint.setAlphaf(0.5f);
-            canvas->drawImage(image, 100, 100, &paint);
-
-            paint.setColor(SK_ColorBLACK);
-            canvas->drawString("Hello World!", 100.0f, 100.0f, font, paint);
+            canvas->drawImage(image, 100, 100);
 
             canvas->restore();
             canvas->flush();
@@ -99,6 +112,28 @@ int main(int argc, char *argv[]) {
         });
 
     app->run();
+}
 
+void test2() {
+    rxcpp::schedulers::run_loop rlp;
+    auto rlp_worker = rxcpp::observe_on_run_loop(rlp);
+
+    rxcpp::subjects::subject<int> subject;
+
+    auto cs = subject.get_observable()
+                  // .subscribe_on(rlp_worker)
+                  .observe_on(rlp_worker)
+                  .subscribe([](int i) { std::cout << i << std::endl; });
+
+    subject.get_subscriber().on_next(1);
+    subject.get_subscriber().on_next(2);
+
+    while (!rlp.empty() && rlp.peek().when < rlp.now()) {
+        rlp.dispatch();
+    }
+}
+
+int main(int argc, char *argv[]) {
+    test2();
     return 0;
 }

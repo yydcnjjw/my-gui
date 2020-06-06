@@ -38,8 +38,8 @@ template <> class ResourceProvider<Font> {
   public:
     ~ResourceProvider<Font>() { ::FT_Done_FreeType(this->_ft_lib); }
 
-    static std::shared_ptr<Font> load(const fs::path &path) {
-        return ResourceProvider<Font>::load(ResourceStreamInfo::make(path));
+    static std::shared_ptr<Font> load(const ResourcePathInfo &info) {
+        return ResourceProvider<Font>::load(ResourceStreamInfo::make(info));
     }
 
     static std::shared_ptr<Font> load(const ResourceStreamInfo &info) {

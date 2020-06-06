@@ -47,11 +47,19 @@ class Blob : public Resource {
 
   protected:
     Blob(const ResourceStreamInfo &info) {
-        this->_blob_data.assign(info.size, 0);
+        if (info.offset != 0) {
+            info.is->seekg(info.offset);
+        }
+
+        auto size = info.size - info.offset;
+        
+        this->_blob_data.assign(size, 0);
+        
         info.is->read(
-            reinterpret_cast<char *>(this->_blob_data.data()), info.size);
+            reinterpret_cast<char *>(this->_blob_data.data()), size);
+        
         auto read_size = info.is->gcount();
-        if (static_cast<std::streamsize>(info.size) != read_size) {
+        if (static_cast<std::streamsize>(size) != read_size) {
             throw std::runtime_error(
                 (boost::format("%1%: size error read: %2%, info: %3%") %
                  info.uri.encoded_url().to_string() % read_size % info.size)
@@ -65,8 +73,8 @@ class Blob : public Resource {
 
 template <> class ResourceProvider<Blob> {
   public:
-    static std::shared_ptr<Blob> load(const fs::path &path) {
-        return ResourceProvider<Blob>::load(ResourceStreamInfo::make(path));
+    static std::shared_ptr<Blob> load(const ResourcePathInfo &info) {
+        return ResourceProvider<Blob>::load(ResourceStreamInfo::make(info));
     }
     static std::shared_ptr<Blob> load(const ResourceStreamInfo &info) {
         return Blob::make(info);
