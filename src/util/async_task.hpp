@@ -83,7 +83,7 @@ class AsyncTask {
         boost::asio::steady_timer _timer;
         Callback _callback;
         std::chrono::milliseconds _interval;
-        bool _cancel = false;
+        std::atomic_bool _cancel = false;
 
         static void on_timer(const boost::system::error_code &,
                              Timer<Callback> *timer) {

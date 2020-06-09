@@ -48,6 +48,11 @@ class Image : public Resource {
         return std::make_shared<Image>(sk_image);
     }
 
+    static std::shared_ptr<Image> make(const uint8_t *data,
+                                       const my::ISize2D &size) {
+        return std::make_shared<Image>(data, size);
+    }
+
     void export_bmp24(const fs::path &path) {
         boost::gil::write_view(
             path.string(),
@@ -71,6 +76,13 @@ class Image : public Resource {
         boost::gil::read_and_convert_image(in, *this->_image,
                                            boost::gil::png_tag());
     }
+
+    Image(const uint8_t *data, const my::ISize2D &size)
+        : Image(SkImage::MakeRasterData(
+              SkImageInfo::MakeN32Premul(size.width(), size.height()),
+              SkData::MakeWithoutCopy(data, size.width() * size.height() *
+                                                Image::pixel_size),
+              size.width() * Image::pixel_size)) {}
 
   private:
     std::shared_ptr<image_type> _image{};

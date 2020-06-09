@@ -16,6 +16,7 @@ class Window {
 
     virtual std::shared_ptr<LLGL::Surface> get_surface() = 0;
     virtual sk_sp<SkSurface> get_sk_surface() = 0;
+    virtual void set_render_cb(std::function<void (SkCanvas *)>) = 0;
     virtual void swap_window() = 0;
     virtual WindowID get_window_id() = 0;
     virtual void hide() = 0;

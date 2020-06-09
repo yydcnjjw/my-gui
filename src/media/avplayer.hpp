@@ -1,6 +1,9 @@
 #pragma once
 
-#include <render/canvas.h>
+#include <SDL2/SDL.h>
+#include <my_render.hpp>
+#include <render/window/window_mgr.h>
+#include <storage/image.hpp>
 #include <storage/resource_mgr.hpp>
 #include <util/async_task.hpp>
 #include <util/logger.h>
@@ -136,7 +139,7 @@ class VideoDecCtx : public DecCtx {
             throw std::runtime_error(av_err2str(ret));
         }
         assert(ret == w * h * 4);
-        this->_image_cache = std::make_shared<my::Image>(this->_data[0], w, h);
+        // this->_size = w * h * 4;
     }
 
     ~VideoDecCtx() {
@@ -151,16 +154,21 @@ class VideoDecCtx : public DecCtx {
         return (AVPixelFormat)this->_st->codecpar->format;
     }
 
-    std::shared_ptr<my::Image>
-    convert_cached(const std::shared_ptr<VideoFrame> &frame) {
+    std::shared_ptr<SkBitmap>
+    convert_cached_bitmap(const std::shared_ptr<VideoFrame> &frame) {
         ::sws_scale(this->_sws_ctx, frame->data(), frame->line_size(), 0,
                     frame->h(), this->_data, this->_linesize);
-        return _image_cache;
+
+        auto bitmap = std::make_shared<SkBitmap>();
+        int w = frame->w();
+        int h = frame->h();
+        bitmap->installPixels(SkImageInfo::MakeN32Premul(w, h), this->_data[0],
+                              this->_linesize[0]);
+        return bitmap;
     }
 
   private:
     SwsContext *_sws_ctx;
-    std::shared_ptr<Image> _image_cache;
     uint8_t *_data[4]{};
     int _linesize[4]{};
 };
@@ -233,8 +241,9 @@ class AudioDecCtx : public DecCtx {
 
 class AVPlayer {
   public:
-    AVPlayer(const std::string &url, Canvas *canvas, AsyncTask *async_task)
-        : _canvas(canvas), _video_queue(std::make_shared<Queue_t>()),
+    AVPlayer(const std::string &url, AsyncTask *async_task,
+             Window *win = nullptr)
+        : _window(win), _video_queue(std::make_shared<Queue_t>()),
           _audio_queue(std::make_shared<Queue_t>()) {
         int ret{};
         if ((ret = ::avformat_open_input(&this->_fmt_ctx, url.c_str(), nullptr,
@@ -295,7 +304,7 @@ class AVPlayer {
     AVFormatContext *_fmt_ctx{};
 
     SDL_AudioDeviceID _audio_device{};
-    Canvas *_canvas{};
+    Window *_window{};
 
     std::shared_ptr<VideoDecCtx> _video_dec_ctx{};
     std::shared_ptr<AudioDecCtx> _audio_dec_ctx{};
@@ -363,9 +372,14 @@ class AVPlayer {
         auto frame =
             std::static_pointer_cast<VideoFrame>(this->_video_queue->pop());
         auto &time_base = this->_video_dec_ctx->time_base();
-        auto image = this->_video_dec_ctx->convert_cached(frame);
-        this->_canvas->draw_image(image, {0, 0}, {frame->w(), frame->h()});
-        this->_canvas->render();
+
+        auto bitmap = this->_video_dec_ctx->convert_cached_bitmap(frame);
+        this->_window->set_render_cb(
+            [bitmap](SkCanvas *canvas) { canvas->drawBitmap(*bitmap, 0, 0); });
+
+        if (this->_window) {
+            this->_window->swap_window();
+        }
 
         if (this->_is_exit) {
             return;
@@ -380,8 +394,9 @@ class AVPlayer {
         auto next_pts = next_frame->pts(time_base);
 
         auto wait_timer = next_pts - pts - elapsed.count();
-        GLOG_D("handle video frame: pts %d, next_pts %d, wait_timer %d", pts,
-               next_pts, wait_timer);
+        GLOG_D("handle video frame: pts %d, next_pts %d, elapsed %d, "
+               "wait_timer %d",
+               pts, next_pts, elapsed.count(), wait_timer);
         if (wait_timer < 0) {
             wait_timer = 0;
         }
