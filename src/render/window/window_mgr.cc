@@ -63,33 +63,16 @@ class SDLWindow : public my::Window {
         SDLWindow *_win;
     };
 
-    SDLWindow(SDL_Window *win, my::EventBus *ev_bus)
-        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window)),
-          _ev_bus(ev_bus)
+    SDLWindow(SDL_Window *win)
+        : _sdl_window(win), _win_id(SDL_GetWindowID(this->_sdl_window))
     // ,_surface(std::make_shared<SDLSurface>(this))
-    {
-        this->_build_gl_context(this->_sdl_window);
-
-        this->_paint_cs =
-            this->_ev_bus->on_event<WindowPaint>()
-                .filter(
-                    [this](const std::shared_ptr<my::Event<WindowPaint>> &e) {
-                        return e->data->win_id == this->get_window_id();
-                    })
-                .observe_on(this->_ev_bus->ev_bus_worker())
-                .subscribe([this](const auto &) {
-                    if (this->_render_cb) {
-                        this->_render_cb(this->get_sk_surface()->getCanvas());
-                    }
-                    this->get_sk_surface()->getCanvas()->flush();
-                    ::SDL_GL_SwapWindow(this->_sdl_window);
-                });
-    }
+    {}
 
     ~SDLWindow() {
         this->_paint_cs.unsubscribe();
         if (this->_gl_context) {
             ::SDL_GL_DeleteContext(this->_gl_context);
+            this->_gl_context = nullptr;
         }
 
         ::SDL_DestroyWindow(this->_sdl_window);
@@ -105,15 +88,14 @@ class SDLWindow : public my::Window {
             this->_sk_surface->height() != h) {
             this->_sk_surface = this->_make_sk_surface();
         }
+
+        assert(std::this_thread::get_id() == this->_thread_id);
         return this->_sk_surface;
     }
-    
-    void set_render_cb(std::function<void(SkCanvas *)> cb) override {
-        this->_render_cb = cb;
-    }
-    
+
     void swap_window() override {
-        this->_ev_bus->post<WindowPaint>(this->get_window_id());
+        ::SDL_GL_SwapWindow(this->_sdl_window);
+        // this->_ev_bus->post<WindowPaint>(this->get_window_id());
     }
 
     my::ISize2D get_frame_buffer_size() override {
@@ -201,14 +183,13 @@ class SDLWindow : public my::Window {
   private:
     SDL_Window *_sdl_window{};
     my::WindowID _win_id{};
-    my::EventBus *_ev_bus{};
     std::shared_ptr<SDLSurface> _surface{};
     sk_sp<SkSurface> _sk_surface{};
-    std::function<void(SkCanvas *)> _render_cb{};
 
     bool _is_visible{true};
 
-    SDL_GLContext _gl_context;
+    SDL_GLContext _gl_context{};
+    std::thread::id _thread_id;
 
     rxcpp::composite_subscription _paint_cs;
 
@@ -222,9 +203,15 @@ class SDLWindow : public my::Window {
         if (success != 0) {
             throw std::runtime_error(SDL_GetError());
         }
+
+        this->_thread_id = std::this_thread::get_id();
     }
 
     sk_sp<SkSurface> _make_sk_surface() {
+        if (!this->_gl_context) {
+            this->_build_gl_context(this->_sdl_window);
+        }
+
         auto [w, h] = this->get_frame_buffer_size();
 
         ::glViewport(0, 0, w, h);
@@ -269,7 +256,7 @@ class SDLWindow : public my::Window {
 class SDLWindowMgr : public my::WindowMgr {
 
   public:
-    SDLWindowMgr(my::EventBus *bus): _ev_bus(bus) {
+    SDLWindowMgr(my::EventBus *bus) : _ev_bus(bus) {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO) != 0) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -353,7 +340,7 @@ class SDLWindowMgr : public my::WindowMgr {
         if (sdl_win == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
-        auto win = std::make_unique<SDLWindow>(sdl_win, this->_ev_bus);
+        auto win = std::make_unique<SDLWindow>(sdl_win);
         auto id = win->get_window_id();
         GLOG_D("----------create window %d %s", id, title.c_str());
         this->_windows[id] = std::move(win);

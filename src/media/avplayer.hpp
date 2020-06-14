@@ -241,9 +241,9 @@ class AudioDecCtx : public DecCtx {
 
 class AVPlayer {
   public:
-    AVPlayer(const std::string &url, AsyncTask *async_task,
-             Window *win = nullptr)
-        : _window(win), _video_queue(std::make_shared<Queue_t>()),
+    AVPlayer(const std::string &url, AsyncTask *async_task
+             )
+        : _video_queue(std::make_shared<Queue_t>()),
           _audio_queue(std::make_shared<Queue_t>()) {
         int ret{};
         if ((ret = ::avformat_open_input(&this->_fmt_ctx, url.c_str(), nullptr,
@@ -285,6 +285,10 @@ class AVPlayer {
             std::chrono::milliseconds(0));
     }
 
+    void set_render_cb(std::function<void (std::shared_ptr<SkBitmap>)> cb) {
+        this->_render_cb = cb;
+    }
+
     ~AVPlayer() {
         this->_is_exit = true;
         ::SDL_CloseAudioDevice(this->_audio_device);
@@ -304,7 +308,6 @@ class AVPlayer {
     AVFormatContext *_fmt_ctx{};
 
     SDL_AudioDeviceID _audio_device{};
-    Window *_window{};
 
     std::shared_ptr<VideoDecCtx> _video_dec_ctx{};
     std::shared_ptr<AudioDecCtx> _audio_dec_ctx{};
@@ -320,6 +323,11 @@ class AVPlayer {
     std::atomic_bool _is_exit{false};
     std::shared_mutex _lock{};
     std::condition_variable_any _cv{};
+
+    std::condition_variable _audio_wait_cv{};
+    std::condition_variable _video_wait_cv{};
+
+    std::function<void (std::shared_ptr<SkBitmap>)> _render_cb;
 
     void _handle_audio_frame(std::shared_ptr<boost::asio::steady_timer> timer) {
         cpu_timer cpu_timer;
@@ -374,11 +382,8 @@ class AVPlayer {
         auto &time_base = this->_video_dec_ctx->time_base();
 
         auto bitmap = this->_video_dec_ctx->convert_cached_bitmap(frame);
-        this->_window->set_render_cb(
-            [bitmap](SkCanvas *canvas) { canvas->drawBitmap(*bitmap, 0, 0); });
-
-        if (this->_window) {
-            this->_window->swap_window();
+        if (this->_render_cb) {
+            this->_render_cb(bitmap);
         }
 
         if (this->_is_exit) {

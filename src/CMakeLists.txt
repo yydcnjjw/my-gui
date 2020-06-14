@@ -13,7 +13,6 @@ set(my-gui_inc
   ${skia_inc})
 
 set(my-gui_src
-  main.cc
   application.cc
   util/async_task.cc
   util/event_bus.cc
@@ -82,16 +81,17 @@ set(DEPS
   ${skia_lib}
   )
 
-add_executable(my-gui ${my-gui_src})
-target_link_libraries(my-gui
-  ${DEPS}
-  )
-target_include_directories(my-gui PUBLIC ${my-gui_inc})
 add_library(my-gui_lib SHARED ${my-gui_src})
 target_link_libraries(my-gui_lib
   ${DEPS}
   )
 target_include_directories(my-gui_lib PUBLIC ${my-gui_inc})
+
+add_executable(my-gui main.cc)
+target_link_libraries(my-gui
+  ${DEPS}
+  my-gui_lib
+  )
 
 set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
 set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)

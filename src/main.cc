@@ -32,10 +32,29 @@ void test1(int argc, char *argv[]) {
     // my::Canvas canvas(renderer.get(), win, ev_bus.get(), resource_mgr.get(),
     //                   font_mgr.get());
 
-    win->get_sk_surface();
-    auto player = my::av::AVPlayer(url, async_task, win);
+    auto player = my::av::AVPlayer(url, async_task);
 
-    // std::this_thread::sleep_for(std::chrono::seconds(100));
+    struct PaintEvent {
+        std::shared_ptr<SkBitmap> render_bitmap{};
+        PaintEvent(std::shared_ptr<SkBitmap> render_bitmap)
+            : render_bitmap(render_bitmap) {}
+    };
+    ev_bus->on_event<PaintEvent>()
+        .observe_on(ev_bus->ev_bus_worker())
+        .subscribe([win](const auto &e) {
+            auto render_bitmap = e->data->render_bitmap;
+            auto canvas = win->get_sk_surface()->getCanvas();
+            canvas->clear(SkColors::kWhite.toSkColor());
+            if (render_bitmap) {
+                canvas->drawBitmap(*render_bitmap, 0, 0);
+            }
+            canvas->flush();
+            win->swap_window();
+        });
+
+    player.set_render_cb([ev_bus](std::shared_ptr<SkBitmap> bitmap) {
+        ev_bus->post<PaintEvent>(bitmap);
+    });
 
     ev_bus->on_event<my::WindowEvent>()
         .subscribe_on(ev_bus->ev_bus_worker())
@@ -55,7 +74,8 @@ void test2() {
 
     rxcpp::subjects::subject<int> subject;
 
-    auto cs = subject.get_observable()
+    auto cs = subject
+                  .get_observable()
                   // .subscribe_on(rlp_worker)
                   .observe_on(rlp_worker)
                   .subscribe([](int i) { std::cout << i << std::endl; });
