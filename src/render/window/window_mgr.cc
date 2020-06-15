@@ -89,6 +89,8 @@ class SDLWindow : public my::Window {
             this->_sk_surface = this->_make_sk_surface();
         }
 
+        this->set_gl_context();
+
         assert(std::this_thread::get_id() == this->_thread_id);
         return this->_sk_surface;
     }
@@ -193,16 +195,24 @@ class SDLWindow : public my::Window {
 
     rxcpp::composite_subscription _paint_cs;
 
+    void set_gl_context() {
+        if (!this->_gl_context) {
+            return;
+        }
+        auto success =
+            ::SDL_GL_MakeCurrent(this->_sdl_window, this->_gl_context);
+        if (success != 0) {
+            throw std::runtime_error(SDL_GetError());
+        }
+    }
+
     void _build_gl_context(SDL_Window *window) {
         this->_gl_context = ::SDL_GL_CreateContext(window);
         if (!this->_gl_context) {
             throw std::runtime_error(SDL_GetError());
         }
 
-        auto success = ::SDL_GL_MakeCurrent(window, this->_gl_context);
-        if (success != 0) {
-            throw std::runtime_error(SDL_GetError());
-        }
+        // set_gl_context();
 
         this->_thread_id = std::this_thread::get_id();
     }
@@ -333,9 +343,10 @@ class SDLWindowMgr : public my::WindowMgr {
         SDL_Window *sdl_win =
             SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED,
                              SDL_WINDOWPOS_UNDEFINED, w, h,
-                             // SDL_WINDOW_VULKAN |
                              SDL_WINDOW_UTILITY | SDL_WINDOW_ALLOW_HIGHDPI |
-                                 SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+                                 SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL
+                             // | SDL_WINDOW_VULKAN
+            );
 
         if (sdl_win == nullptr) {
             throw std::runtime_error(SDL_GetError());

@@ -88,7 +88,61 @@ void test2() {
     }
 }
 
+void test_multi_window(int argc, char *argv[]) {
+    auto app = my::new_application(argc, argv, {});
+    auto ev_bus = app->ev_bus();
+
+    auto win_mgr = app->win_mgr();
+
+    auto win1 = win_mgr->create_window("test1", 200, 200);
+    auto win2 = win_mgr->create_window("test2", 200, 200);
+
+    auto c1 = [&]() { return win1->get_sk_surface()->getCanvas(); };
+    auto c2 = [&]() { return win2->get_sk_surface()->getCanvas(); };
+
+    auto canvas1 = c1;
+    auto canvas2 = c2();
+
+    canvas1()->clear(SkColors::kBlue.toSkColor());
+    canvas1()->flush();
+    win1->swap_window();
+    
+    // canvas2->clear(SkColors::kRed.toSkColor());
+    // canvas2->flush();
+    // win2->swap_window();
+
+    SkPaint paint;
+    paint.setColor(SkColors::kGreen);
+    canvas1()->drawIRect(my::IRect::MakeWH(100, 100), paint);
+    canvas1()->flush();
+    win1->swap_window();
+    
+    // c1()->clear(SkColors::kBlue.toSkColor());
+    // c1()->flush();
+    // win1->swap_window();
+    
+    // c2()->clear(SkColors::kRed.toSkColor());
+    // c2()->flush();
+    // win2->swap_window();
+
+    // SkPaint paint;
+    // paint.setColor(SkColors::kGreen);
+    // c1()->drawIRect(my::IRect::MakeWH(100, 100), paint);
+    // c1()->flush();
+    // win1->swap_window();
+
+    ev_bus->on_event<my::WindowEvent>()
+        .subscribe_on(ev_bus->ev_bus_worker())
+        .observe_on(ev_bus->ev_bus_worker())
+        .subscribe([&](const std::shared_ptr<my::Event<my::WindowEvent>> &e) {
+            if (e->data->event == SDL_WINDOWEVENT_CLOSE) {
+                ev_bus->post<my::QuitEvent>();
+            }
+        });
+    app->run();
+}
+
 int main(int argc, char *argv[]) {
-    test1(argc, argv);
+    test_multi_window(argc, argv);
     return 0;
 }
