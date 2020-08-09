@@ -10,21 +10,20 @@ namespace my {
 
 class Blob : public Resource {
   public:
-    virtual size_t used_mem() override { return this->_blob_data.size(); }
+    virtual size_t used_mem() override { return this->size(); }
+
+    size_t size() const { return this->_blob_size; }
+
+    const void *data() const { return this->_blob_data; }
 
     std::unique_ptr<std::istream> stream() {
         return std::make_unique<
             boost::iostreams::stream<boost::iostreams::array_source>>(
-            reinterpret_cast<const char *>(this->_blob_data.data()),
-            this->_blob_data.size());
+            reinterpret_cast<const char *>(this->data()), this->size());
     }
 
-    /**
-     * @brief      copy blob to string
-     *
-     */
-    std::string string() {
-        return std::string(this->_blob_data.begin(), this->_blob_data.end());
+    sk_sp<SkData> sk_data() const {
+        return SkData::MakeWithoutCopy(this->data(), this->size());
     }
 
     /**
@@ -32,32 +31,32 @@ class Blob : public Resource {
      *
      */
     std::string_view string_view() {
-        return std::string_view(
-            reinterpret_cast<char *>(this->_blob_data.data()),
-            this->_blob_data.size());
+        return std::string_view(reinterpret_cast<const char *>(this->data()),
+                                this->size());
     }
-
-    size_t size() { return this->_blob_data.size(); }
-
-    const uint8_t *data() { return this->_blob_data.data(); }
 
     static std::shared_ptr<Blob> make(const ResourceStreamInfo &info) {
         return std::shared_ptr<Blob>{new Blob(info)};
     }
 
+    static std::shared_ptr<Blob> make(const void *data, size_t size) {
+        return std::shared_ptr<Blob>{new Blob(data, size)};
+    }
+
   protected:
+    Blob(const void *data, size_t size) : _blob_data(data), _blob_size(size) {}
+
     Blob(const ResourceStreamInfo &info) {
         if (info.offset != 0) {
             info.is->seekg(info.offset);
         }
 
         auto size = info.size - info.offset;
-        
-        this->_blob_data.assign(size, 0);
-        
-        info.is->read(
-            reinterpret_cast<char *>(this->_blob_data.data()), size);
-        
+
+        auto data = new uint8_t[size];
+
+        info.is->read(reinterpret_cast<char *>(data), size);
+
         auto read_size = info.is->gcount();
         if (static_cast<std::streamsize>(size) != read_size) {
             throw std::runtime_error(
@@ -65,10 +64,14 @@ class Blob : public Resource {
                  info.uri.encoded_url().to_string() % read_size % info.size)
                     .str());
         }
+
+        this->_blob_data = data;
+        this->_blob_size = size;
     }
 
   private:
-    std::vector<uint8_t> _blob_data;
+    const void *_blob_data;
+    size_t _blob_size;
 };
 
 template <> class ResourceProvider<Blob> {

@@ -58,3 +58,6 @@ set(skia_inc
   CACHE INTERNAL "")
 set(skia_lib ${skia_src_dir}/out/Release/libskia.a CACHE INTERNAL "")
 
+build_dep(oiio)
+set(OpenImageIO_DIR ${DEPS_DIR}/lib/cmake/OpenImageIO CACHE INTERNAL "")
+

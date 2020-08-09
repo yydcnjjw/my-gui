@@ -59,7 +59,7 @@ struct XP3ArchiveChunkAldr {
 } __attribute__((packed));
 
 struct XP3ArchiveFileInfo {
-    std::string path;
+    my::fs::path path;
     uint32_t flag;
     uint64_t org_size;
     uint64_t arc_size;
@@ -114,7 +114,6 @@ class XP3Archive : public my::Archive {
                                        0x72 /*'r'*/};
 
         std::shared_ptr<XP3ArchiveFileInfo> file_info = nullptr;
-        utf16_codecvt code_cvt;
 
         uint64_t read_size = 0;
         auto read = [&ss_decomp, &read_size](void *data, size_t size) {
@@ -137,10 +136,11 @@ class XP3Archive : public my::Archive {
                 file_info->org_size = info.org_size;
                 file_info->arc_size = info.arc_size;
                 file_info->flag = info.flag;
-                file_info->path.resize(info.len);
-                std::u16string s(info.len, 0);
-                read(s.data(), info.len * 2);
-                file_info->path = code_cvt.to_bytes(s);
+                std::u16string path(info.len, 0);
+                read(path.data(), info.len * 2);
+                auto utf8_path = codecvt::utf_to_utf<char>(path);
+                std::replace(utf8_path.begin(), utf8_path.end(), '\\', '/');
+                file_info->path = utf8_path;
 
             } else if (!std::memcmp(chunk.type, chunk_segm, 4)) {
                 assert(file_info);
@@ -168,6 +168,15 @@ class XP3Archive : public my::Archive {
 
     bool exists(const my::fs::path &path) override {
         return this->_xp3_index.find(path) != this->_xp3_index.end();
+    }
+
+    std::vector<std::string> list_files() override {
+        std::vector<std::string> v;
+        std::transform(
+            this->_xp3_index.begin(), this->_xp3_index.end(),
+            std::back_inserter(v),
+            [](const xp3_index_map::value_type &it) { return it.first; });
+        return v;
     }
 
     class XP3Source : public boost::iostreams::source {
@@ -261,8 +270,9 @@ class XP3Archive : public my::Archive {
 
   private:
     my::fs::path _archive_path;
-    std::unordered_map<std::string, std::shared_ptr<XP3ArchiveFileInfo>>
-        _xp3_index;
+    using xp3_index_map =
+        std::map<my::fs::path, std::shared_ptr<XP3ArchiveFileInfo>>;
+    xp3_index_map _xp3_index;
 };
 
 } // namespace

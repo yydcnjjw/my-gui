@@ -10,7 +10,8 @@ set(my-gui_inc
   ${msdfgen_inc}
   ${vinniefalco.url_inc}
   ${LLGL_inc}
-  ${skia_inc})
+  ${skia_inc}
+  .)
 
 set(my-gui_src
   application.cc
@@ -47,6 +48,7 @@ find_package(OpenGL REQUIRED)
 # build
 find_package(glm CONFIG REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
+find_package(OpenImageIO CONFIG REQUIRED)
 
 set(boost_deps
   Boost::thread
@@ -73,6 +75,7 @@ set(DEPS
   PNG::PNG
   JPEG::JPEG
   ${boost_deps}
+  OpenImageIO::OpenImageIO
   # build
   glm::glm
   rxcpp
@@ -89,9 +92,10 @@ target_include_directories(my-gui_lib PUBLIC ${my-gui_inc})
 
 add_executable(my-gui main.cc)
 target_link_libraries(my-gui
-  ${DEPS}
   my-gui_lib
   )
+
+add_subdirectory(tool)
 
 set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
 set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)

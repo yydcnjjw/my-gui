@@ -8,6 +8,7 @@
 #include <media/audio_mgr.hpp>
 #include <render/window/window_mgr.h>
 #include <skia/include/core/SkFontMgr.h>
+#include <skia/include/core/SkImageGenerator.h>
 #include <skia/include/core/SkTypeface.h>
 #include <storage/font.hpp>
 #include <storage/image.hpp>
@@ -39,6 +40,7 @@ void test1(int argc, char *argv[]) {
         PaintEvent(std::shared_ptr<SkBitmap> render_bitmap)
             : render_bitmap(render_bitmap) {}
     };
+
     ev_bus->on_event<PaintEvent>()
         .observe_on(ev_bus->ev_bus_worker())
         .subscribe([win](const auto &e) {
@@ -88,6 +90,19 @@ void test2() {
     }
 }
 
+void test3(int argc, char *argv[]) {
+    auto image = my::Image::make(my::Blob::make(my::ResourceStreamInfo::make(
+        my::ResourcePathInfo::make(argv[1], 0))));
+
+    auto data = image->sk_image()->encodeToData();
+    std::ofstream ofs("test.png");    
+    ofs.write(reinterpret_cast<const char *>(data->data()), data->size());
+    
+    image->export_png("test_export.png");
+    image->export_bmp24("test_export.bmp");
+    Logger::get()->close();
+}
+
 void test_multi_window(int argc, char *argv[]) {
     auto app = my::new_application(argc, argv, {});
     auto ev_bus = app->ev_bus();
@@ -106,7 +121,7 @@ void test_multi_window(int argc, char *argv[]) {
     canvas1()->clear(SkColors::kBlue.toSkColor());
     canvas1()->flush();
     win1->swap_window();
-    
+
     // canvas2->clear(SkColors::kRed.toSkColor());
     // canvas2->flush();
     // win2->swap_window();
@@ -116,11 +131,11 @@ void test_multi_window(int argc, char *argv[]) {
     canvas1()->drawIRect(my::IRect::MakeWH(100, 100), paint);
     canvas1()->flush();
     win1->swap_window();
-    
+
     // c1()->clear(SkColors::kBlue.toSkColor());
     // c1()->flush();
     // win1->swap_window();
-    
+
     // c2()->clear(SkColors::kRed.toSkColor());
     // c2()->flush();
     // win2->swap_window();
@@ -143,6 +158,6 @@ void test_multi_window(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    test_multi_window(argc, argv);
+    test3(argc, argv);
     return 0;
 }

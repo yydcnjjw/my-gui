@@ -21,6 +21,8 @@ class Archive {
 
     virtual ArchiveFile extract(const fs::path &path) = 0;
 
+    virtual std::vector<std::string> list_files() = 0;
+
     typedef std::function<std::shared_ptr<Archive>(const fs::path &)>
         make_archive_func;
     static const std::map<std::string, make_archive_func> &supported_archives();

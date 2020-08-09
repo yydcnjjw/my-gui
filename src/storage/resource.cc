@@ -9,7 +9,7 @@ std::unique_ptr<std::ifstream> make_ifstream(const fs::path &path) {
 }
 std::unique_ptr<std::ofstream> make_ofstream(const fs::path &path) {
     auto ofs = std::make_unique<std::ofstream>();
-    ofs->exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    ofs->exceptions(std::ofstream::failbit | std::ofstream::badbit);
     ofs->open(path);
     return ofs;
 }
