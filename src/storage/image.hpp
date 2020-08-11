@@ -68,7 +68,24 @@ class Image : public Resource {
                                          blob->size());
         auto in = OIIO::ImageInput::open(".exr", nullptr, &mr);
         if (!in) {
-            throw std::runtime_error("oiio load image failure");
+            char buf[] = "my_gui_XXXXXX";
+            if (mkstemp(buf) == -1) {
+                throw std::runtime_error(std::strerror(errno));
+            }
+
+            fs::path path{buf};
+
+            boost::iostreams::copy(*blob->stream(), *make_ofstream(path));
+
+            in = OIIO::ImageInput::open(path);
+            fs::remove(path);
+        }
+
+        if (!in) {
+            throw std::runtime_error(
+                (boost::format("oiio image load failure: %1%") %
+                 OIIO::geterror())
+                    .str());
         }
 
         auto tmp_spec = in->spec();
