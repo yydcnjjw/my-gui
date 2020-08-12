@@ -3,15 +3,19 @@
 
 int main(int argc, char *argv[]) {
 
-    my::program_options::options_description desc("xp3 extract options: ");
-
+    my::program_options::options_description desc("xp3 extract options");
     desc.add_options()("help,h", "help")(
-        "src,s", my::program_options::value<my::fs::path>(), "src file")(
+        "src,c", my::program_options::value<my::fs::path>(), "src file")(
         "dst,d", my::program_options::value<my::fs::path>(), "dst dir");
 
+    my::program_options::positional_options_description p_desc;
+    p_desc.add("src", 1);
+
     my::program_options::variables_map vm;
-    my::program_options::store(
-        my::program_options::parse_command_line(argc, argv, desc), vm);
+    auto parser = my::program_options::command_line_parser(argc, argv)
+                      .options(desc)
+                      .positional(p_desc);
+    my::program_options::store(parser.run(), vm);
     my::program_options::notify(vm);
 
     if (vm.count("help")) {
@@ -20,6 +24,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!vm.count("src")) {
+        std::cout << "no src file" << std::endl;
         return -1;
     }
 

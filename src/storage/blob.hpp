@@ -10,17 +10,15 @@ namespace my {
 
 class Blob : public Resource {
   public:
+    using blob_stream =
+        boost::iostreams::stream<boost::iostreams::array_source>;
     virtual size_t used_mem() override { return this->size(); }
 
     size_t size() const { return this->_blob_size; }
 
     const void *data() const { return this->_blob_data; }
 
-    std::unique_ptr<std::istream> stream() {
-        return std::make_unique<
-            boost::iostreams::stream<boost::iostreams::array_source>>(
-            reinterpret_cast<const char *>(this->data()), this->size());
-    }
+    blob_stream &stream() { return this->_stream; }
 
     sk_sp<SkData> sk_data() const {
         return SkData::MakeWithoutCopy(this->data(), this->size());
@@ -44,7 +42,10 @@ class Blob : public Resource {
     }
 
   protected:
-    Blob(const void *data, size_t size) : _blob_data(data), _blob_size(size) {}
+    Blob(const void *data, size_t size)
+        : _blob_data(data), _blob_size(size),
+          _stream(reinterpret_cast<const char *>(this->_blob_data),
+                  this->_blob_size) {}
 
     Blob(const ResourceStreamInfo &info) {
         if (info.offset != 0) {
@@ -67,11 +68,14 @@ class Blob : public Resource {
 
         this->_blob_data = data;
         this->_blob_size = size;
+        this->_stream.open(reinterpret_cast<const char *>(this->_blob_data),
+                           this->_blob_size);
     }
 
   private:
     const void *_blob_data;
     size_t _blob_size;
+    blob_stream _stream;
 };
 
 template <> class ResourceProvider<Blob> {

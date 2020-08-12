@@ -63,16 +63,16 @@ template <> class ResourceProvider<Font> {
 
     static unsigned long ft_read(FT_Stream stream, unsigned long offset,
                                  unsigned char *buffer, unsigned long count) {
-        auto is = static_cast<std::istream *>(stream->descriptor.pointer);
-        return is->readsome(reinterpret_cast<char *>(buffer + offset), count);
+        auto font = static_cast<Font *>(stream->descriptor.pointer);
+        return font->stream().readsome(
+            reinterpret_cast<char *>(buffer + offset), count);
     }
 
     static void ft_close(FT_Stream) {}
 
     static FT_Face open_face(std::shared_ptr<Font> font, int index) {
-        auto is = font->stream();
         FT_StreamDesc desc;
-        { desc.pointer = is.get(); }
+        { desc.pointer = font.get(); }
 
         auto stream = std::make_shared<FT_StreamRec>();
         {

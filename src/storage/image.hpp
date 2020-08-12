@@ -75,7 +75,7 @@ class Image : public Resource {
 
             fs::path path{buf};
 
-            boost::iostreams::copy(*blob->stream(), *make_ofstream(path));
+            boost::iostreams::copy(blob->stream(), *make_ofstream(path));
 
             in = OIIO::ImageInput::open(path);
             fs::remove(path);
