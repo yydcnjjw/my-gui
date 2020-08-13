@@ -91,13 +91,14 @@ void test2() {
 }
 
 void test3(int argc, char *argv[]) {
-    auto image = my::Image::make(my::Blob::make(my::ResourceStreamInfo::make(
-        my::ResourcePathInfo::make(argv[1], 0))));
+    auto image =
+        my::Image::make(my::Blob::make(my::ResourceStreamProvideInfo::make(
+            my::ResourceFileProvideInfo{argv[1]})));
 
     auto data = image->sk_image()->encodeToData();
-    std::ofstream ofs("test.png");    
+    std::ofstream ofs("test.png");
     ofs.write(reinterpret_cast<const char *>(data->data()), data->size());
-    
+
     image->export_png("test_export.png");
     image->export_bmp24("test_export.bmp");
     Logger::get()->close();
@@ -158,6 +159,6 @@ void test_multi_window(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    test3(argc, argv);
+    // test3(argc, argv);
     return 0;
 }

@@ -33,7 +33,7 @@ class Blob : public Resource {
                                 this->size());
     }
 
-    static std::shared_ptr<Blob> make(const ResourceStreamInfo &info) {
+    static std::shared_ptr<Blob> make(const ResourceStreamProvideInfo &info) {
         return std::shared_ptr<Blob>{new Blob(info)};
     }
 
@@ -47,7 +47,7 @@ class Blob : public Resource {
           _stream(reinterpret_cast<const char *>(this->_blob_data),
                   this->_blob_size) {}
 
-    Blob(const ResourceStreamInfo &info) {
+    Blob(const ResourceStreamProvideInfo &info) {
         if (info.offset != 0) {
             info.is->seekg(info.offset);
         }
@@ -61,8 +61,8 @@ class Blob : public Resource {
         auto read_size = info.is->gcount();
         if (static_cast<std::streamsize>(size) != read_size) {
             throw std::runtime_error(
-                (boost::format("%1%: size error read: %2%, info: %3%") %
-                 info.uri.encoded_url().to_string() % read_size % info.size)
+                (boost::format("size error read: %2%, info: %3%") % read_size %
+                 info.size)
                     .str());
         }
 
@@ -80,10 +80,11 @@ class Blob : public Resource {
 
 template <> class ResourceProvider<Blob> {
   public:
-    static std::shared_ptr<Blob> load(const ResourcePathInfo &info) {
-        return ResourceProvider<Blob>::load(ResourceStreamInfo::make(info));
+    static std::shared_ptr<Blob> load(const ResourceFileProvideInfo &info) {
+        return ResourceProvider<Blob>::load(
+            ResourceStreamProvideInfo::make(info));
     }
-    static std::shared_ptr<Blob> load(const ResourceStreamInfo &info) {
+    static std::shared_ptr<Blob> load(const ResourceStreamProvideInfo &info) {
         return Blob::make(info);
     }
 };

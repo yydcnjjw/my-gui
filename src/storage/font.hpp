@@ -12,8 +12,6 @@ namespace my {
 
 class Font : public Blob {
   public:
-    ~Font() { // ::FT_Done_Face(this->_face);
-    }
     virtual size_t used_mem() override { return 0; }
 
     sk_sp<SkTypeface> get_sk_typeface() {
@@ -21,11 +19,11 @@ class Font : public Blob {
         return this->_sk_typeface;
     }
 
-    static std::shared_ptr<Font> make(const ResourceStreamInfo &info) {
+    static std::shared_ptr<Font> make(const ResourceStreamProvideInfo &info) {
         return std::make_shared<Font>(info);
     }
 
-    Font(const ResourceStreamInfo &info)
+    Font(const ResourceStreamProvideInfo &info)
         : Blob(info),
           _sk_typeface(SkTypeface::MakeFromData(
               SkData::MakeWithoutCopy(this->data(), this->size()))) {}
@@ -38,11 +36,11 @@ template <> class ResourceProvider<Font> {
   public:
     ~ResourceProvider<Font>() { ::FT_Done_FreeType(this->_ft_lib); }
 
-    static std::shared_ptr<Font> load(const ResourcePathInfo &info) {
-        return ResourceProvider<Font>::load(ResourceStreamInfo::make(info));
+    static std::shared_ptr<Font> load(const ResourceFileProvideInfo &info) {
+        return ResourceProvider<Font>::load(ResourceStreamProvideInfo::make(info));
     }
 
-    static std::shared_ptr<Font> load(const ResourceStreamInfo &info) {
+    static std::shared_ptr<Font> load(const ResourceStreamProvideInfo &info) {
         return Font::make(info);
     }
 

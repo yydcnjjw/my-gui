@@ -115,10 +115,10 @@ class ImageView {};
 
 template <> class ResourceProvider<Image> {
   public:
-    static std::shared_ptr<Image> load(const ResourcePathInfo &info) {
-        return ResourceProvider<Image>::load(ResourceStreamInfo::make(info));
+    static std::shared_ptr<Image> load(const ResourceFileProvideInfo & info) {
+        return ResourceProvider<Image>::load(ResourceStreamProvideInfo::make(info));
     }
-    static std::shared_ptr<Image> load(ResourceStreamInfo info) {
+    static std::shared_ptr<Image> load(const ResourceStreamProvideInfo &info) {
         return Image::make(Blob::make(info));
     }
 };

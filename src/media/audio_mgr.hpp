@@ -168,14 +168,14 @@ template <> class ResourceProvider<Audio> {
     /**
      * @brief      load from fs
      */
-    static std::shared_ptr<Audio> load(const ResourcePathInfo &info) {
+    static std::shared_ptr<Audio> load(const ResourceFileProvideInfo &info) {
         return ResourceProvider<Audio>::get()._load(info.path);
     }
 
     /**
      * @brief      load from stream
      */
-    static std::shared_ptr<Audio> load(const ResourceStreamInfo &info) {
+    static std::shared_ptr<Audio> load(const ResourceStreamProvideInfo &info) {
         char buf[] = "my_gui_XXXXXX";
         if (mkstemp(buf) == -1) {
             throw std::runtime_error(std::strerror(errno));
@@ -185,7 +185,7 @@ template <> class ResourceProvider<Audio> {
 
         boost::iostreams::copy(*info.is, *make_ofstream(path));
 
-        auto audio = ResourceProvider<Audio>::load(ResourcePathInfo{path, 0});
+        auto audio = ResourceProvider<Audio>::load(ResourceFileProvideInfo{path, 0});
         fs::remove(path);
         return audio;
     }
