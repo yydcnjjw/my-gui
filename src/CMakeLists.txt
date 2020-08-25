@@ -11,6 +11,7 @@ set(my-gui_inc
   ${vinniefalco.url_inc}
   ${LLGL_inc}
   ${skia_inc}
+  ${sdl2mixer_inc}
   .)
 
 set(my-gui_src
@@ -32,7 +33,7 @@ set(my-gui_src
 # system
 find_package(Threads REQUIRED)
 find_package(SDL2 REQUIRED)
-find_package(SDL2Mixer REQUIRED)
+# find_package(SDL2Mixer REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
   thread program_options iostreams locale timer coroutine)
 find_package(FFMPEG REQUIRED)
@@ -65,7 +66,6 @@ set(DEPS
   SDL2::SDL2
   OpenGL::OpenGL
   OpenGL::GLX
-  ${SDL2Mixer_LIBRARIES}
   # ${cairo_LIBRARIES}
   ${FFMPEG_LIBRARIES}
   ${webp_LIBRARIES}
@@ -82,6 +82,7 @@ set(DEPS
   ${LLGL_lib}
   ${msdfgen_lib}
   ${skia_lib}
+  ${sdl2mixer_lib}
   )
 
 add_library(my-gui_lib SHARED ${my-gui_src})

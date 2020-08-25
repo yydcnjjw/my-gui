@@ -63,18 +63,19 @@ class AsyncTask {
 
         void start() {
             this->_timer.expires_after(this->_interval);
-            this->_cancel = false;
+            this->_is_enable = true;
             this->_timer.async_wait(boost::bind<void>(
                 on_timer, boost::asio::placeholders::error, this));
         }
 
-        bool is_cancel() { return this->_cancel; }
+        bool is_enable() { return this->_is_enable; }
+        bool is_cancel() { return !this->_is_enable; }
 
         void cancel() {
-            if (this->_cancel) {
+            if (this->is_cancel()) {
                 return;
             }
-            this->_cancel = true;
+            this->_is_enable = false;
             this->_timer.cancel();
         }
         void wait() { this->_timer.wait(); }
@@ -83,11 +84,14 @@ class AsyncTask {
         boost::asio::steady_timer _timer;
         Callback _callback;
         std::chrono::milliseconds _interval;
-        std::atomic_bool _cancel = false;
+        std::atomic_bool _is_enable{false};
 
-        static void on_timer(const boost::system::error_code &,
+        static void on_timer(const boost::system::error_code &ec,
                              Timer<Callback> *timer) {
-            if (!timer->_cancel) {
+            if (ec == boost::asio::error::operation_aborted) {
+                return;
+            }
+            if (timer->is_enable()) {
                 timer->_callback();
                 timer->_timer.expires_at(timer->_timer.expiry() +
                                          timer->_interval);

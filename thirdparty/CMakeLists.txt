@@ -61,3 +61,7 @@ set(skia_lib ${skia_src_dir}/out/Release/libskia.a CACHE INTERNAL "")
 build_dep(oiio)
 set(OpenImageIO_DIR ${DEPS_DIR}/lib/cmake/OpenImageIO CACHE INTERNAL "")
 
+build_dep(sdl2mixer)
+set(sdl2mixer_inc ${DEPS_DIR}/include CACHE INTERNAL "")
+set(sdl2mixer_lib ${DEPS_DIR}/lib/libSDL2_mixer.so CACHE INTERNAL "")
+

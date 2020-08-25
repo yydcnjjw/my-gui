@@ -1,9 +1,10 @@
 #pragma once
 
-#include <SDL2/SDL_mixer.h>
+#include <SDL2/SDL_mixer.h>    
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/stream.hpp>
 
+#include <storage/blob.hpp>
 #include <storage/resource_mgr.hpp>
 
 namespace my {
@@ -169,25 +170,17 @@ template <> class ResourceProvider<Audio> {
      * @brief      load from fs
      */
     static std::shared_ptr<Audio> load(const ResourceFileProvideInfo &info) {
-        return ResourceProvider<Audio>::get()._load(info.path);
+        return ResourceProvider<Audio>::get()._load(
+            ::SDL_RWFromFile(info.path.c_str(), "rb"), 1);
     }
 
     /**
      * @brief      load from stream
      */
     static std::shared_ptr<Audio> load(const ResourceStreamProvideInfo &info) {
-        char buf[] = "my_gui_XXXXXX";
-        if (mkstemp(buf) == -1) {
-            throw std::runtime_error(std::strerror(errno));
-        }
-
-        fs::path path{buf};
-
-        boost::iostreams::copy(*info.is, *make_ofstream(path));
-
-        auto audio = ResourceProvider<Audio>::load(ResourceFileProvideInfo{path, 0});
-        fs::remove(path);
-        return audio;
+        auto blob = Blob::make(info);
+        return ResourceProvider<Audio>::get()._load(
+            ::SDL_RWFromMem(const_cast<void *>(blob->data()), blob->size()), 0);
     }
 
   private:
@@ -198,16 +191,17 @@ template <> class ResourceProvider<Audio> {
             throw std::runtime_error(Mix_GetError());
         }
 
-        if (::Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, AUDIO_S16SYS, 2, 4096) < 0) {
+        if (::Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT,
+                            MIX_DEFAULT_CHANNELS, 4096) < 0) {
             throw std::runtime_error(Mix_GetError());
         }
 
         ::Mix_AllocateChannels(16);
     }
 
-    std::shared_ptr<Audio> _load(const fs::path &path) {
+    std::shared_ptr<Audio> _load(SDL_RWops *src, int freesrc) {
         Mix_Chunk *chunk{};
-        if (!(chunk = ::Mix_LoadWAV(path.c_str()))) {
+        if (!(chunk = ::Mix_LoadWAV_RW(src, freesrc))) {
             throw std::runtime_error(Mix_GetError());
         }
         return Audio::make(chunk);

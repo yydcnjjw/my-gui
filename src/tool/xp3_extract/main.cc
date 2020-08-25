@@ -37,10 +37,6 @@ int main(int argc, char *argv[]) {
         extract_path = src_path.parent_path() / src_path.stem();
     }
 
-    if (!my::fs::exists(extract_path)) {
-        my::fs::create_directory(extract_path);
-    }
-
     auto xp3_make = my::Archive::supported_archives().at(".xp3");
 
     auto xp3_archive = xp3_make(src_path);
@@ -51,8 +47,12 @@ int main(int argc, char *argv[]) {
         auto path = extract_path / my::fs::path(file_name);
         *xp3_ofs << path << std::endl;
 
-        if (my::fs::is_directory(path)) {
-            my::fs::create_directory(path);
+        if (!my::fs::exists(path.parent_path())) {
+            my::fs::create_directories(path.parent_path());
+        }
+
+        if (my::fs::is_directory(path) && !my::fs::exists(path)) {
+            my::fs::create_directories(path);
         } else {
             auto data = xp3_archive->extract(file_name);
             auto ofs = my::make_ofstream(path);
