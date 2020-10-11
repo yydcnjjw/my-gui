@@ -19,7 +19,7 @@ struct WindowPaint {
     WindowPaint(my::WindowID win_id) : win_id(win_id) {}
 };
 
-class SDLWindow : public my::Window {
+class SDLWindow : public my::window {
   public:
     class SDLSurface : public LLGL::Surface {
       public:
@@ -337,7 +337,7 @@ class SDLWindowMgr : public my::WindowMgr {
         }
         SDL_Quit();
     }
-    my::Window *create_window(const std::string &title, uint32_t w,
+    my::window *create_window(const std::string &title, uint32_t w,
                               uint32_t h) override {
         // TODO: 考虑 继承
         SDL_Window *sdl_win =
@@ -358,7 +358,7 @@ class SDLWindowMgr : public my::WindowMgr {
         return this->_windows.at(id).get();
     }
 
-    void remove_window(my::Window *win) override {
+    void remove_window(my::window *win) override {
         GLOG_D("----------remove window %d", win->get_window_id());
         this->_windows.erase(win->get_window_id());
     }
@@ -382,7 +382,7 @@ class SDLWindowMgr : public my::WindowMgr {
     }
 
   private:
-    std::map<my::WindowID, std::unique_ptr<SDLWindow>> _windows;
+    std::map<my::window_id, std::unique_ptr<SDLWindow>> _windows;
     my::EventBus *_ev_bus{};
     std::thread _win_mgr_thread;
     my::DisplayMode _desktop_display_mode;

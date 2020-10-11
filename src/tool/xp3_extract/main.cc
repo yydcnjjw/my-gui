@@ -59,7 +59,5 @@ int main(int argc, char *argv[]) {
             *ofs << data.is->rdbuf();
         }
     }
-
-    Logger::get()->close();
     return 0;
 }

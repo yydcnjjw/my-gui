@@ -5,6 +5,7 @@
 
 namespace my {
 using WindowID = uint32_t;
+using Keysym = SDL_Keysym;
 enum Keymod {
     KMOD_NONE = 0x0000,
     KMOD_LSHIFT = 0x0001,
@@ -64,9 +65,8 @@ struct KeyboardEvent {
     WindowID win_id;
     uint8_t state;
     bool repeat;
-    SDL_Keysym keysym;
-    KeyboardEvent(WindowID win_id, uint8_t state, bool repeat,
-                  SDL_Keysym keysym)
+    Keysym keysym;
+    KeyboardEvent(WindowID win_id, uint8_t state, bool repeat, Keysym keysym)
         : win_id(win_id), state(state), repeat(repeat), keysym(keysym) {}
 };
 

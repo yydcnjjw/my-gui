@@ -6,9 +6,62 @@
 #include <boost/asio/thread_pool.hpp>
 #include <boost/thread/future.hpp>
 #include <iostream>
+#include <rx.hpp>
 
 namespace my {
 
+class observe_on_one_thread {
+  public:
+    typedef std::thread::native_handle_type thread_type;
+    typedef rxcpp::observe_on_one_worker coordination_type;
+    typedef coordination_type::coordinator_type coordinator_type;
+    typedef rxcpp::composite_subscription coordinator_state_type;
+    observe_on_one_thread()
+        : _coordinator(observe_on_one_thread::create_coordinator(
+              this->_thread, this->_coordinator_state)) {
+    }
+    ~observe_on_one_thread() {
+        // exit thread
+        this->coordinator_state().unsubscribe();
+    }
+
+    coordination_type get() {
+        return rxcpp::observe_on_one_worker(this->_coordinator.get_scheduler());
+    }
+
+    coordinator_type &coordinator() { return this->_coordinator; }
+    coordinator_state_type &coordinator_state() {
+        return this->_coordinator_state;
+    }
+
+    thread_type &thread() { return this->_thread; }
+
+  private:
+    thread_type _thread;
+    coordinator_state_type _coordinator_state;    
+    coordinator_type _coordinator;
+
+    static coordinator_type create_coordinator(thread_type &t,
+                                               coordinator_state_type &s) {
+        return rxcpp::observe_on_one_worker(
+                   rxcpp::rxsc::make_new_thread([&t](std::function<void()> f) {
+                       auto thread = std::thread(std::bind(
+                           [](std::function<void()> f) { f(); }, std::move(f)));
+                       t = thread.native_handle();
+                       return thread;
+                   }))
+            .create_coordinator(s);
+    }
+};
+
+class BasicService {
+  public:
+    observe_on_one_thread &coordination() { return this->coordination_; }
+
+  private:
+    observe_on_one_thread coordination_;
+};
+    
 template <class Fun> class y_combinator_result {
     Fun fun_;
 
@@ -122,7 +175,9 @@ class AsyncTask {
         return timer;
     }
 
-    static std::unique_ptr<AsyncTask> create();
+    static std::unique_ptr<AsyncTask> create() {
+        return std::make_unique<AsyncTask>();
+    }
 
   private:
     boost::asio::thread_pool _pool;

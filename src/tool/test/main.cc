@@ -8,6 +8,5 @@ int main(int argc, char *argv[]) {
     auto audio = resource_mgr->load<my::Audio>("bgm/bgm_01.ogg").get();
     audio->play();
     sleep(5);
-    Logger::get()->close();
     return 0;
 }

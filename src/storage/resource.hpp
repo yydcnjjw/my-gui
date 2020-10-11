@@ -3,6 +3,7 @@
 #include <fstream>
 #include <typeindex>
 #include <typeinfo>
+#include <shared_mutex>
 
 #include <boost/noncopyable.hpp>
 

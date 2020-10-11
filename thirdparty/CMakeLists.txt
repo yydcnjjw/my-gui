@@ -1,4 +1,7 @@
+set(dep_build_no_cache OFF)
+
 macro(build_dep dep_name)
+if(NOT ${dep_name}_builded OR ${dep_build_no_cache})
   set(dep_name ${dep_name})
   set(dep_src_dir ${DEPS_DIR}/${dep_name}/${dep_name}-src)
   set(dep_build_dir ${DEPS_DIR}/${dep_name}/${dep_name}-build)
@@ -13,13 +16,14 @@ macro(build_dep dep_name)
   execute_process(COMMAND ${CMAKE_COMMAND} --build .
     WORKING_DIRECTORY ${DEPS_DIR}/${dep_name})
 
-  set(${dep_name}_src_dir ${dep_src_dir})
-  set(${dep_name}_build_dir ${dep_build_dir})
+  set(${dep_name}_src_dir ${dep_src_dir} CACHE INTERNAL "")
+  set(${dep_name}_build_dir ${dep_build_dir} CACHE INTERNAL "")
+  set(${dep_name}_builded ON CACHE BOOL "" FORCE)
+endif()
 endmacro()
 
 # googtest
 build_dep(googletest)
-
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(gtest_dir ${DEPS_DIR}/lib64/cmake/GTest)
 if(EXISTS ${gtest_dir})
@@ -37,13 +41,13 @@ build_dep(glm)
 set(glm_DIR ${glm_src_dir}/cmake/glm CACHE INTERNAL "")
 
 # msdfgen
-build_dep(msdfgen)
-set(msdfgen_lib ${msdfgen_build_dir}/libmsdfgen.a CACHE INTERNAL "")
-set(msdfgen_inc ${msdfgen_src_dir} CACHE INTERNAL "")
+# build_dep(msdfgen)
+# set(msdfgen_lib ${msdfgen_build_dir}/libmsdfgen.a CACHE INTERNAL "")
+# set(msdfgen_inc ${msdfgen_src_dir} CACHE INTERNAL "")
 
 # vinniefalco/url
-build_dep(vinniefalco.url)
-set(vinniefalco.url_inc ${vinniefalco.url_src_dir}/include CACHE INTERNAL "")
+# build_dep(vinniefalco.url)
+# set(vinniefalco.url_inc ${vinniefalco.url_src_dir}/include CACHE INTERNAL "")
 
 # LLGL
 build_dep(LLGL)
@@ -58,10 +62,15 @@ set(skia_inc
   CACHE INTERNAL "")
 set(skia_lib ${skia_src_dir}/out/Release/libskia.a CACHE INTERNAL "")
 
+# oiio
 build_dep(oiio)
 set(OpenImageIO_DIR ${DEPS_DIR}/lib/cmake/OpenImageIO CACHE INTERNAL "")
 
+# sdl2 mixer
 build_dep(sdl2mixer)
 set(sdl2mixer_inc ${DEPS_DIR}/include CACHE INTERNAL "")
 set(sdl2mixer_lib ${DEPS_DIR}/lib/libSDL2_mixer.so CACHE INTERNAL "")
 
+# tree.hh
+build_dep(tree_hh)
+set(tree_hh_inc ${tree_hh_src_dir}/src CACHE INTERNAL "")

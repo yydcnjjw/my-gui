@@ -1,32 +1,46 @@
 #pragma once
 
-#include <rx.hpp>
-
 #include <bitset>
-#include <shared_mutex>
+#include <boost/format.hpp>
 
-class Logger {
+#include <util/async_task.hpp>
+
+class Logger : public my::BasicService {
   public:
     enum Level { DEBUG, INFO, WARN, ERROR };
-    using bitmap = std::bitset<32>;
 
-    static const Logger::bitmap logger_all_target;
+    static const std::string &to_level_str(Logger::Level l) {
+        static const std::map<Logger::Level, const std::string> _level_str = {
+            {Logger::Level::DEBUG, "DEBUG"},
+            {Logger::Level::INFO, "INFO"},
+            {Logger::Level::WARN, "WARN"},
+            {Logger::Level::ERROR, "ERROR"}};
+        return _level_str.at(l);
+    }
+
     struct LogMsg {
-        Logger::bitmap bitmap;
         Logger::Level level;
         std::string msg;
         const char *file_name;
         int file_line;
-        LogMsg(Logger::bitmap map, Level level, std::string msg,
-               const char *file_name, int file_line)
-            : bitmap(map), level(level), msg(std::move(msg)),
-              file_name(file_name), file_line(file_line) {}
+        LogMsg(Level level, std::string msg, const char *file_name,
+               int file_line)
+            : level(level), msg(std::move(msg)), file_name(file_name),
+              file_line(file_line) {}
 
-        [[nodiscard]] std::string format() const;
+        std::string format() const {
+            // TODO: In order to obtain temporary short path
+            auto file_name = std::string(this->file_name);
+            file_name = file_name.substr(file_name.rfind("src"));
 
-      private:
-        static const std::map<Level, const std::string> &get_level_str();
+            std::ostringstream os;
+            os << "[" << Logger::to_level_str(this->level) << "]"
+               << " " << file_name << " " << this->file_line << ": " << msg;
+            return os.str();
+        }
     };
+
+    typedef rxcpp::subjects::subject<std::shared_ptr<LogMsg>> observable_type;
 
     class LoggerOutput {
       public:
@@ -38,73 +52,49 @@ class Logger {
 
     void addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output);
 
-    void Log(bitmap bitmap, Logger::Level type, const char *file_name,
-             int file_len, const char *fmt, ...);
+    template <typename... Args>
+    void Log(Logger::Level type, const char *file_name, int file_len,
+             const char *fmt, Args &&... args) {
+        auto log_msg = std::make_shared<LogMsg>(
+            type, (boost::format(fmt) % ... % std::forward<Args>(args)).str(),
+            file_name, file_len);
+        this->log_source().get_subscriber().on_next(log_msg);
+    }
 
     static Logger *get() {
         static Logger instance;
         return &instance;
     }
 
-    void close();
-
-    void set_level(Level level) {
-        this->_level = level;
-    }
+    void set_level(Level level) { this->_level = level; }
 
   private:
-    Logger();
-    
-    bitmap _bitmap;
     Level _level{DEBUG};
 
-    std::string _buf;
-    std::mutex _lock;
-    std::condition_variable _cv;
-    void _addLogOutputTarget(unsigned long offset,
-                             const std::shared_ptr<LoggerOutput> &output);
+    std::set<rxcpp::composite_subscription> _output_targets;
 
-    std::map<bitmap, rxcpp::subscription> _output_targets;
+    observable_type _log_source;
 
-    rxcpp::subjects::subject<std::shared_ptr<LogMsg>> _log_source;
-    // NOTE: log thread log_worker ref(stack var)
-    // do not need to release
-    rxcpp::observe_on_one_worker *_log_worker;
-    std::thread _log_thread;
+    Logger();
+    observable_type &log_source() { return this->_log_source; }
 };
 
-#define LOG_D(logger, target, fmt, args...)                                    \
-    (logger)->Log(target, Logger::Level::DEBUG, __FILE__, __LINE__, fmt, ##args)
+#define LOG_D(logger, fmt, args...)                                            \
+    (logger)->Log(Logger::Level::DEBUG, __FILE__, __LINE__, fmt, ##args)
 
-#define LOG_I(logger, target, fmt, args...)                                    \
-    (logger)->Log(target, Logger::Level::INFO, __FILE__, __LINE__, fmt, ##args)
+#define LOG_I(logger, fmt, args...)                                            \
+    (logger)->Log(Logger::Level::INFO, __FILE__, __LINE__, fmt, ##args)
 
-#define LOG_W(logger, target, fmt, args...)                                    \
-    (logger)->Log(target, Logger::Level::WARN, __FILE__, __LINE__, fmt, ##args)
+#define LOG_W(logger, fmt, args...)                                            \
+    (logger)->Log(Logger::Level::WARN, __FILE__, __LINE__, fmt, ##args)
 
-#define LOG_E(logger, target, fmt, args...)                                    \
-    (logger)->Log(target, Logger::Level::ERROR, __FILE__, __LINE__, fmt, ##args)
+#define LOG_E(logger, fmt, args...)                                            \
+    (logger)->Log(Logger::Level::ERROR, __FILE__, __LINE__, fmt, ##args)
 
-#define GLOG_T_D(target, fmt, args...)                                         \
-    LOG_D(Logger::get(), target, fmt, ##args)
+#define GLOG_D(fmt, args...) LOG_D(Logger::get(), fmt, ##args)
 
-#define GLOG_T_I(target, fmt, args...)                                         \
-    LOG_I(Logger::get(), target, fmt, ##args)
+#define GLOG_I(fmt, args...) LOG_I(Logger::get(), fmt, ##args)
 
-#define GLOG_T_W(target, fmt, args...)                                         \
-    LOG_W(Logger::get(), target, fmt, ##args)
+#define GLOG_W(fmt, args...) LOG_W(Logger::get(), fmt, ##args)
 
-#define GLOG_T_E(target, fmt, args...)                                         \
-    LOG_E(Logger::get(), target, fmt, ##args)
-
-#define GLOG_D(fmt, args...)                                                   \
-    GLOG_T_D(Logger::logger_all_target, fmt, ##args)
-
-#define GLOG_I(fmt, args...)                                                   \
-    GLOG_T_I(Logger::logger_all_target, fmt, ##args)
-
-#define GLOG_W(fmt, args...)                                                   \
-    GLOG_T_W(Logger::logger_all_target, fmt, ##args)
-
-#define GLOG_E(fmt, args...)                                                   \
-    GLOG_T_E(Logger::logger_all_target, fmt, ##args)
+#define GLOG_E(fmt, args...) LOG_E(Logger::get(), fmt, ##args)

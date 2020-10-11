@@ -7,25 +7,23 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(my-gui_inc
   # build
   ${DEPS_DIR}/include
-  ${msdfgen_inc}
-  ${vinniefalco.url_inc}
   ${LLGL_inc}
   ${skia_inc}
   ${sdl2mixer_inc}
+  ${tree_hh_inc}
   .)
 
 set(my-gui_src
   application.cc
-  util/async_task.cc
-  util/event_bus.cc
   util/logger.cc
   util/uuid.cc
+  window/service.cc
   storage/resource_mgr.cc
   storage/resource.cc
   storage/archive.cc
   storage/xp3_archive.cc
   # storage/font_mgr.cc
-  render/window/window_mgr.cc
+  # render/window/window_mgr.cc
   # render/canvas.cc
   # media/audio_mgr.cc
   )
@@ -80,7 +78,7 @@ set(DEPS
   glm::glm
   rxcpp
   ${LLGL_lib}
-  ${msdfgen_lib}
+  # ${msdfgen_lib}
   ${skia_lib}
   ${sdl2mixer_lib}
   )

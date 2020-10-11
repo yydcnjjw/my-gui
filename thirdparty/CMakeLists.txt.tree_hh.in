@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 2.8.2)
+
+project(@dep_name@ NONE)
+include(ExternalProject)
+
+ExternalProject_Add(tree_hh
+  GIT_REPOSITORY https://github.com/kpeeters/tree.hh.git
+  GIT_TAG master
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=@DEPS_DIR@
+  SOURCE_DIR @dep_src_dir@
+  BINARY_DIR @dep_build_dir@
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+  TEST_COMMAND ""
+  )
