@@ -6,17 +6,10 @@
 #include <util/async_task.hpp>
 
 class Logger : public my::BasicService {
+    typedef my::BasicService base_type;
+
   public:
     enum Level { DEBUG, INFO, WARN, ERROR };
-
-    static const std::string &to_level_str(Logger::Level l) {
-        static const std::map<Logger::Level, const std::string> _level_str = {
-            {Logger::Level::DEBUG, "DEBUG"},
-            {Logger::Level::INFO, "INFO"},
-            {Logger::Level::WARN, "WARN"},
-            {Logger::Level::ERROR, "ERROR"}};
-        return _level_str.at(l);
-    }
 
     struct LogMsg {
         Logger::Level level;
@@ -40,8 +33,6 @@ class Logger : public my::BasicService {
         }
     };
 
-    typedef rxcpp::subjects::subject<std::shared_ptr<LogMsg>> observable_type;
-
     class LoggerOutput {
       public:
         explicit LoggerOutput(Level level = INFO) : limit_level(level) {}
@@ -49,6 +40,11 @@ class Logger : public my::BasicService {
         virtual ~LoggerOutput() = default;
         Logger::Level limit_level;
     };
+
+    typedef rxcpp::subjects::subject<std::shared_ptr<LogMsg>> observable_type;
+
+    Logger();
+    ~Logger() { this->exit(); }
 
     void addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output);
 
@@ -68,6 +64,15 @@ class Logger : public my::BasicService {
 
     void set_level(Level level) { this->_level = level; }
 
+    static const std::string &to_level_str(Logger::Level l) {
+        static const std::map<Logger::Level, const std::string> _level_str = {
+            {Logger::Level::DEBUG, "DEBUG"},
+            {Logger::Level::INFO, "INFO"},
+            {Logger::Level::WARN, "WARN"},
+            {Logger::Level::ERROR, "ERROR"}};
+        return _level_str.at(l);
+    }
+
   private:
     Level _level{DEBUG};
 
@@ -75,8 +80,13 @@ class Logger : public my::BasicService {
 
     observable_type _log_source;
 
-    Logger();
     observable_type &log_source() { return this->_log_source; }
+
+    void exit() {
+        this->log_source().get_observable().subscribe(
+            [](auto) {}, [this]() { base_type::exit(); });
+        this->log_source().get_subscriber().on_completed();
+    }
 };
 
 #define LOG_D(logger, fmt, args...)                                            \

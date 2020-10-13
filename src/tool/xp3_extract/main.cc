@@ -3,20 +3,20 @@
 
 int main(int argc, char *argv[]) {
 
-    my::program_options::options_description desc("xp3 extract options");
+    my::po::options_description desc("xp3 extract options");
     desc.add_options()("help,h", "help")(
-        "src,c", my::program_options::value<my::fs::path>(), "src file")(
-        "dst,d", my::program_options::value<my::fs::path>(), "dst dir");
+        "src,c", my::po::value<my::fs::path>(), "src file")(
+        "dst,d", my::po::value<my::fs::path>(), "dst dir");
 
-    my::program_options::positional_options_description p_desc;
+    my::po::positional_options_description p_desc;
     p_desc.add("src", 1);
 
-    my::program_options::variables_map vm;
-    auto parser = my::program_options::command_line_parser(argc, argv)
+    my::po::variables_map vm;
+    auto parser = my::po::command_line_parser(argc, argv)
                       .options(desc)
                       .positional(p_desc);
-    my::program_options::store(parser.run(), vm);
-    my::program_options::notify(vm);
+    my::po::store(parser.run(), vm);
+    my::po::notify(vm);
 
     if (vm.count("help")) {
         std::cout << desc << std::endl;

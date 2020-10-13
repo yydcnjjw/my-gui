@@ -18,8 +18,10 @@ class WindowServiceError : public std::runtime_error {
 };
 
 class SDLWindowService : public my::WindowService {
-    typedef rxcpp::observable<std::shared_ptr<my::IEvent>> observable_type;
+    typedef my::WindowService base_type;
+    typedef base_type::observable_type observable_type;
 
+  public:
     SDLWindowService() {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
             throw WindowServiceError(SDL_GetError());
@@ -27,10 +29,15 @@ class SDLWindowService : public my::WindowService {
         this->init_event_source();
     }
 
+    observable_type event_source() override { return this->_event_source; }
+
+    void subscribe(my::Observable *source) override { source->event_source(); }
+
+    std::shared_ptr<my::Window> create_window(const std::string &title,
+                                              const my::ISize2D &) override {}
+
   private:
     observable_type _event_source;
-
-    observable_type &event_source() { return this->_event_source; }
 
     void init_event_source() {
         this->_event_source =
@@ -93,3 +100,9 @@ class SDLWindowService : public my::WindowService {
     }
 };
 } // namespace
+
+namespace my {
+std::unique_ptr<WindowService> WindowService::create() {
+    return std::make_unique<SDLWindowService>();
+}
+} // namespace my

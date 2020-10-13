@@ -37,8 +37,8 @@ build_dep(rxcpp)
 set(rxcpp_DIR ${DEPS_DIR}/share/rxcpp/cmake CACHE INTERNAL "")
 
 # # glm
-build_dep(glm)
-set(glm_DIR ${glm_src_dir}/cmake/glm CACHE INTERNAL "")
+# build_dep(glm)
+# set(glm_DIR ${glm_src_dir}/cmake/glm CACHE INTERNAL "")
 
 # msdfgen
 # build_dep(msdfgen)
@@ -50,10 +50,10 @@ set(glm_DIR ${glm_src_dir}/cmake/glm CACHE INTERNAL "")
 # set(vinniefalco.url_inc ${vinniefalco.url_src_dir}/include CACHE INTERNAL "")
 
 # LLGL
-build_dep(LLGL)
-file(GLOB LLGL_lib ${LLGL_build_dir}/build/*)
-set(LLGL_inc ${LLGL_src_dir}/include CACHE INTERNAL "")
-set(LLGL_lib ${LLGL_lib} CACHE INTERNAL "")
+# build_dep(LLGL)
+# file(GLOB LLGL_lib ${LLGL_build_dir}/build/*)
+# set(LLGL_inc ${LLGL_src_dir}/include CACHE INTERNAL "")
+# set(LLGL_lib ${LLGL_lib} CACHE INTERNAL "")
 
 # skia
 build_dep(skia)

@@ -37,15 +37,15 @@ find_package(Boost REQUIRED COMPONENTS
 find_package(FFMPEG REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Fontconfig REQUIRED)
-find_package(Vulkan REQUIRED)
+# find_package(Vulkan REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
 find_package(webp REQUIRED)
-find_package(cairo REQUIRED)
+# find_package(cairo REQUIRED)
 find_package(OpenGL REQUIRED)
 
 # build
-find_package(glm CONFIG REQUIRED)
+# find_package(glm CONFIG REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 
@@ -69,15 +69,15 @@ set(DEPS
   ${webp_LIBRARIES}
   Freetype::Freetype
   Fontconfig::Fontconfig
-  Vulkan::Vulkan
+  # Vulkan::Vulkan
   PNG::PNG
   JPEG::JPEG
   ${boost_deps}
   OpenImageIO::OpenImageIO
   # build
-  glm::glm
+  # glm::glm
   rxcpp
-  ${LLGL_lib}
+  # ${LLGL_lib}
   # ${msdfgen_lib}
   ${skia_lib}
   ${sdl2mixer_lib}
@@ -96,35 +96,35 @@ target_link_libraries(my-gui
 
 add_subdirectory(tool)
 
-set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
-set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)
-file(GLOB shaders
-  ${PROJECT_SHADER_PATH}/*.frag
-  ${PROJECT_SHADER_PATH}/*.vert)
+# set(PROJECT_ASSETS_PATH ${PROJECT_SOURCE_DIR}/assets)
+# set(PROJECT_SHADER_PATH ${PROJECT_ASSETS_PATH}/shaders)
+# file(GLOB shaders
+#   ${PROJECT_SHADER_PATH}/*.frag
+#   ${PROJECT_SHADER_PATH}/*.vert)
 
-set(GLSL_VALIDATOR "/bin/glslangValidator")
+# set(GLSL_VALIDATOR "/bin/glslangValidator")
 
-foreach(glsl ${shaders})
-  get_filename_component(file_name ${glsl} NAME)
-  set(spirv ${PROJECT_SHADER_PATH}/${file_name}.spv)
-  add_custom_command(
-    OUTPUT ${spirv}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SHADER_PATH}
-    COMMAND ${GLSL_VALIDATOR} -V ${glsl} -o ${spirv}
-    DEPENDS ${glsl})
-  list(APPEND spirv_binary_files ${spirv})
-endforeach(glsl)
+# foreach(glsl ${shaders})
+#   get_filename_component(file_name ${glsl} NAME)
+#   set(spirv ${PROJECT_SHADER_PATH}/${file_name}.spv)
+#   add_custom_command(
+#     OUTPUT ${spirv}
+#     COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SHADER_PATH}
+#     COMMAND ${GLSL_VALIDATOR} -V ${glsl} -o ${spirv}
+#     DEPENDS ${glsl})
+#   list(APPEND spirv_binary_files ${spirv})
+# endforeach(glsl)
 
-add_custom_target(
-  shaders
-  DEPENDS ${spirv_binary_files})
+# add_custom_target(
+#   shaders
+#   DEPENDS ${spirv_binary_files})
 
-add_dependencies(my-gui shaders)
+# add_dependencies(my-gui shaders)
 
-add_custom_target(assets)
-add_custom_command(
-  TARGET assets
-  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_ASSETS_PATH} ${DEPLOY_DIR}
-  )
+# add_custom_target(assets)
+# add_custom_command(
+#   TARGET assets
+#   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_ASSETS_PATH} ${DEPLOY_DIR}
+#   )
 
-add_dependencies(my-gui assets)
+# add_dependencies(my-gui assets)
