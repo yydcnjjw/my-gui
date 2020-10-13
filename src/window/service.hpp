@@ -42,8 +42,14 @@ struct DisplayMode {
     int refresh_rate;
 };
 
-class WindowService : public BasicService {
+class WindowService : public BasicService, public Observable, public Observer {
   public:
+#define SERVICE_MAP(XX)                                                        \
+    XX(WindowService, create_window, std::shared_ptr<Window>,                  \
+       const std::string &, const ISize2D &)
+
+    SERVICE_API(WindowService, SERVICE_MAP)
+
     static std::unique_ptr<WindowService> create();
 };
 

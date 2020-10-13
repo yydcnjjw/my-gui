@@ -7,28 +7,26 @@
 namespace {
 
 class PosixApplication : public my::Application {
+    using base_type = my::Application;
+
   public:
     PosixApplication(int argc, char **argv,
-                     const my::program_options::options_description &opts_desc)
+                     const base_type::options_description &opts_desc)
+        : base_type(argc, argv, opts_desc)
     // _async_task(my::AsyncTask::create()),
     // _win_mgr(my::WindowMgr::create(this->_ev_bus.get())),
     // _resource_mgr(my::ResourceMgr::create(this->_async_task.get())),
     // _font_mgr(my::FontMgr::create()),
     // _audio_mgr(my::AudioMgr::create()),
     // _renderer(LLGL::RenderSystem::Load("Vulkan"))
-    {
-        this->_parse_program_options(argc, argv, opts_desc);
-    }
+    {}
 
     ~PosixApplication() override {}
 
     void run() override {
         this->on_event<my::QuitEvent>()
             .observe_on(this->coordination())
-            .subscribe([this](auto) {
-                GLOG_D("invoke quit");
-                this->quit();
-            });
+            .subscribe([this](auto) { this->quit(); });
 
         try {
             this->_main_loop.run();
@@ -68,24 +66,7 @@ class PosixApplication : public my::Application {
     //         this->font_mgr());
     // }
 
-    my::program_options::option_description &get_option_desc() {
-        return this->_opts_desc;
-    }
-
-    bool get_program_option(
-        const std::string &option,
-        my::program_options::variable_value &value) const override {
-        if (this->_program_option_map.count(option)) {
-            value = this->_program_option_map[option];
-            return true;
-        } else {
-            return false;
-        }
-    }
-
   private:
-    my::program_options::option_description _opts_desc;
-    my::program_options::variables_map _program_option_map;
     my::main_loop _main_loop;
 
     // std::unique_ptr<my::AsyncTask> _async_task;
@@ -94,25 +75,13 @@ class PosixApplication : public my::Application {
     // std::unique_ptr<my::FontMgr> _font_mgr;
     // std::unique_ptr<my::AudioMgr> _audio_mgr;
     // std::unique_ptr<LLGL::RenderSystem> _renderer;
-
-    void _parse_program_options(
-        int argc, char **argv,
-        const my::program_options::options_description &opts) {
-        my::program_options::store(
-            my::program_options::command_line_parser(argc, argv)
-                .options(opts)
-                .allow_unregistered()
-                .run(),
-            this->_program_option_map);
-        my::program_options::notify(this->_program_option_map);
-    }
 };
 } // namespace
 
 namespace my {
 std::unique_ptr<Application>
 Application::create(int argc, char **argv,
-                    const program_options::options_description &opts_desc) {
+                    const po::options_description &opts_desc) {
     return std::make_unique<PosixApplication>(argc, argv, opts_desc);
 }
 } // namespace my

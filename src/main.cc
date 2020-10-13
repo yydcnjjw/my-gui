@@ -163,26 +163,32 @@
 //     app->run();
 // }
 #include <application.h>
-#include <boost/format.hpp>
-#include <util/logger.h>
+#include <my_render.hpp>
+#include <tree.hh>
+#include <tree_util.hh>
 
-void set_current_thread_name(const std::string &name) {
-    pthread_setname_np(pthread_self(), name.c_str());
-}
+namespace my {
 
-std::string current_thread_name() {
-    std::string s(32, 0);
-    pthread_getname_np(pthread_self(), s.data(), s.size());
-    return s;
-}
+class Node {
+  public:
+    Node() {}
+    Node(IRect range) : range(range) {}
 
-std::string get_pid() {
-    std::stringstream s;
-    s << std::this_thread::get_id();
-    return s.str();
-}
+    template <typename... Args> static auto make(Args &&... args) {
+        return std::make_shared<my::Node>(std::forward<Args>(args)...);
+    }
+
+    IRect range;
+};
+
+class Scene : public tree<std::shared_ptr<my::Node>> {
+    
+};
+
+} // namespace my
 
 int main(int argc, char **argv) {
+    GLOG_D("run application");
     auto app = my::Application::create(argc, argv);
 
     rxcpp::observable<>::timer(std::chrono::seconds(3))
@@ -192,7 +198,11 @@ int main(int argc, char **argv) {
             app->post<my::QuitEvent>();
         });
 
+    my::Scene scene;
+    auto root = scene.set_head(my::Node::make());
+    auto i = scene.append_child(root, my::Node::make());
+
     app->run();
     GLOG_I("exit!");
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
 }

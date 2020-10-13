@@ -65,5 +65,3 @@ void Logger::addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output) {
         .subscribe(
             [output](const std::shared_ptr<LogMsg> &msg) { (*output)(*msg); });
 }
-
-

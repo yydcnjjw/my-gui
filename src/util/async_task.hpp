@@ -1,12 +1,15 @@
 #pragma once
 
+#include <any>
+
 #define BOOST_THREAD_PROVIDES_FUTURE
 #define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
 #include <boost/asio.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/thread/future.hpp>
-#include <iostream>
 #include <rx.hpp>
+
+#include <util/event_bus.hpp>
 
 namespace my {
 
@@ -18,8 +21,7 @@ class observe_on_one_thread {
     typedef rxcpp::composite_subscription coordinator_state_type;
     observe_on_one_thread()
         : _coordinator(observe_on_one_thread::create_coordinator(
-              this->_thread, this->_coordinator_state)) {
-    }
+              this->_thread, this->_coordinator_state)) {}
     ~observe_on_one_thread() {
         // exit thread
         this->coordinator_state().unsubscribe();
@@ -38,7 +40,7 @@ class observe_on_one_thread {
 
   private:
     thread_type _thread;
-    coordinator_state_type _coordinator_state;    
+    coordinator_state_type _coordinator_state;
     coordinator_type _coordinator;
 
     static coordinator_type create_coordinator(thread_type &t,
@@ -54,14 +56,52 @@ class observe_on_one_thread {
     }
 };
 
+// rpc
+template <typename... Args> struct ServiceRequestEvent {
+    std::string service;
+    std::string function;
+    std::tuple<Args...> params;
+
+    ServiceRequestEvent(const std::string &service, const std::string &function,
+                        Args &&... args)
+        : service(service), function(function),
+          params(std::forward<Args>(args)...) {}
+};
+
 class BasicService {
   public:
     observe_on_one_thread &coordination() { return this->coordination_; }
 
+    void exit() { this->coordination().coordinator_state().unsubscribe(); }
+
+    // virtual const std::string &name() = 0;
+#define DECL_API(service, name, ret, args...) virtual ret name(args) = 0;
+
+#define DEFINE_API_INVOKE(service, name, ret, args...)                         \
+    std::any invoke_##name(std::shared_ptr<service> self,                      \
+                           std::shared_ptr<IEvent> e) {                        \
+        return std::apply(                                                     \
+            static_cast<ret (service::*)(args)>(&service::name),               \
+            std::tuple_cat(                                                    \
+                std::make_tuple(self),                                         \
+                std::dynamic_pointer_cast<Event<ServiceRequestEvent<args>>>(e) \
+                    ->params));                                                \
+    }
+
+#define REGISTER_API(service, name, ret, args...)                              \
+    { #name, &service::invoke_##name }
+
+#define SERVICE_API(service, map)                                              \
+    map(DECL_API) map(DEFINE_API_INVOKE)                                       \
+        std::multimap<std::string,                                             \
+                      std::any (service::*)(std::shared_ptr<service>,          \
+                                            std::shared_ptr<IEvent>)>          \
+            api_map_{map(REGISTER_API)};
+
   private:
     observe_on_one_thread coordination_;
 };
-    
+
 template <class Fun> class y_combinator_result {
     Fun fun_;
 
