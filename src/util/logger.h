@@ -84,7 +84,7 @@ class Logger : public my::BasicService {
 
     void exit() {
         this->log_source().get_observable().subscribe(
-            [](auto) {}, [this]() { base_type::exit(); });
+            [](auto) {}, [this]() { base_type::exit().get(); });
         this->log_source().get_subscriber().on_completed();
     }
 };

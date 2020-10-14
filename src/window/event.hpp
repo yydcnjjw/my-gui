@@ -39,54 +39,56 @@ struct MouseState {
     IPoint2D pos;
     MouseState(uint32_t mask, IPoint2D pos) : mask(mask), pos(pos) {}
 };
+class Window;
+using WidnowPtr = std::shared_ptr<Window>;
 
-struct MouseMotionEvent {
-    WindowID win_id;
+struct WindowEvent {
+    WidnowPtr win;
+    WindowEvent(WidnowPtr win) : win(win) {}
+};
+
+struct MouseMotionEvent : public WindowEvent {
     IPoint2D pos;
     ISize2D rel;
     uint32_t state;
 
-    MouseMotionEvent(WindowID win_id, IPoint2D pos, ISize2D rel, uint32_t state)
-        : win_id(win_id), pos(pos), rel(rel), state(state) {}
+    MouseMotionEvent(WidnowPtr win, IPoint2D pos, ISize2D rel, uint32_t state)
+        : WindowEvent(win), pos(pos), rel(rel), state(state) {}
 };
 
-struct MoushWheelEvent {
-    WindowID win_id;
+struct MoushWheelEvent : public WindowEvent {
     IPoint2D pos;
     uint32_t which;
     uint32_t direction;
 
-    MoushWheelEvent(WindowID win_id, IPoint2D pos, uint32_t which,
+    MoushWheelEvent(WidnowPtr win, IPoint2D pos, uint32_t which,
                     uint32_t direction)
-        : win_id(win_id), pos(pos), which(which), direction(direction) {}
+        : WindowEvent(win), pos(pos), which(which), direction(direction) {}
 };
 
-struct KeyboardEvent {
-    WindowID win_id;
+struct KeyboardEvent : public WindowEvent {
     uint8_t state;
     bool repeat;
     Keysym keysym;
-    KeyboardEvent(WindowID win_id, uint8_t state, bool repeat, Keysym keysym)
-        : win_id(win_id), state(state), repeat(repeat), keysym(keysym) {}
+    KeyboardEvent(WidnowPtr win, uint8_t state, bool repeat, Keysym keysym)
+        : WindowEvent(win), state(state), repeat(repeat), keysym(keysym) {}
 };
 
-struct MouseButtonEvent {
-    WindowID win_id;
+struct MouseButtonEvent : public WindowEvent {
     uint32_t which;
     uint8_t button;
     uint8_t state;
     uint8_t clicks;
     IPoint2D pos;
-    MouseButtonEvent(WindowID win_id, uint32_t which, uint8_t button,
+    MouseButtonEvent(WidnowPtr win, uint32_t which, uint8_t button,
                      uint8_t state, uint8_t clicks, IPoint2D pos)
-        : win_id(win_id), which(which), button(button), state(state),
+        : WindowEvent(win), which(which), button(button), state(state),
           clicks(clicks), pos(pos) {}
 };
 
-struct WindowEvent {
-    WindowID win_id;
+struct WindowStateEvent : public WindowEvent {
     uint8_t event;
-    WindowEvent(WindowID win_id, uint8_t event)
-        : win_id(win_id), event(event) {}
+    WindowStateEvent(WidnowPtr win, uint8_t event)
+        : WindowEvent(win), event(event) {}
 };
 } // namespace my

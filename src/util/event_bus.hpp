@@ -34,7 +34,7 @@ template <typename DataType> class Event : public IEvent, public DataType {
 };
 
 struct Observable {
-    typedef rxcpp::observable<std::shared_ptr<my::IEvent>> observable_type;
+    using observable_type = rxcpp::observable<std::shared_ptr<IEvent>>;
     virtual ~Observable() = default;
     virtual observable_type event_source() = 0;
 };
@@ -49,14 +49,18 @@ struct QuitEvent {
     QuitEvent(bool is_on_error = false) : is_on_error(is_on_error) {}
 };
 
+template <typename T> inline decltype(auto) on_event(Observable *o) {
+    return o->event_source()
+        .filter([](auto e) { return e->template is<T>(); })
+        .map([](auto e) { return std::dynamic_pointer_cast<Event<T>>(e); });
+}
+
 class EventBus : public Observable, public Observer {
     using observable_type = Observable::observable_type;
 
   public:
-    template <typename T> decltype(auto) on_event() {
-        return this->event_source()
-            .filter([](auto e) { return e->template is<T>(); })
-            .map([](auto e) { return std::dynamic_pointer_cast<Event<T>>(e); });
+    observable_type event_source() override {
+        return this->_event_source.get_observable();
     }
 
     void subscribe(Observable *observable) override {
@@ -71,16 +75,13 @@ class EventBus : public Observable, public Observer {
         return std::make_unique<EventBus>();
     }
 
-  private:
-    rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
-
-    observable_type event_source() override {
-        return this->_event_source.get_observable();
-    }
-
+  protected:
     void post(std::shared_ptr<IEvent> e) {
         this->_event_source.get_subscriber().on_next(e);
     }
+
+  private:
+    rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
 };
 
 } // namespace my

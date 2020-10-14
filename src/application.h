@@ -53,23 +53,56 @@ class main_loop {
     bool _need_quit{false};
 };
 
+class ApplicationError : public std::runtime_error {
+  public:
+    ApplicationError(const std::string &msg)
+        : std::runtime_error(msg), _msg(msg) {}
+
+    const char *what() const noexcept override { return this->_msg.c_str(); }
+
+  private:
+    std::string _msg;
+};
+
 class Application : public EventBus {
   public:
     using coordination_type = main_loop::coordination_type;
     using options_description = po::options_description;
     Application(int argc, char **argv, const options_description &opts_desc) {
-        this->_parse_program_options(argc, argv, opts_desc);
+        pthread_setname_np(pthread_self(),
+                           "application service");
+        this->parse_program_options(argc, argv, opts_desc);
+        this->register_service(WindowService::create());
     };
 
     virtual ~Application() = default;
-    virtual void run() = 0;
-    virtual void quit() = 0;
+    void run() {
+        on_event<my::QuitEvent>(this)
+            .observe_on(this->coordination())
+            .subscribe([this](auto) { this->quit(); });
 
-    virtual coordination_type coordination() = 0;
+        try {
+            this->_main_loop.run();
+        } catch (std::exception &e) {
+            GLOG_E(e.what());
+        }
+    };
+    void quit() { this->_main_loop.quit(); };
 
-    // virtual WindowMgr *win_mgr() const = 0;
-    // virtual AsyncTask *async_task() const = 0;
-    // virtual ResourceMgr *resource_mgr() const = 0;
+    coordination_type coordination() {
+        return this->_main_loop.coordination();
+    };
+
+    template <typename Service, typename = std::enable_if_t<
+                                    std::is_base_of_v<BasicService, Service>>>
+    Service *service() {
+        if (this->_services.count(typeid(Service)) == 0) {
+            // TODO: More detailed error information
+            throw ApplicationError("no service");
+        }
+        return dynamic_cast<Service *>(
+            this->_services.at(typeid(Service)).get());
+    }
 
     bool get_program_option(const std::string &option,
                             po::variable_value &value) const {
@@ -85,11 +118,55 @@ class Application : public EventBus {
     create(int argc, char **argv, const options_description & = {});
 
   private:
+    my::main_loop _main_loop;
     options_description _opts_desc;
     po::variables_map _program_option_map;
+    std::map<std::type_index, std::unique_ptr<BasicService>> _services;
 
-    void _parse_program_options(int argc, char **argv,
-                                const options_description &opts) {
+    template <typename Service, typename = std::enable_if_t<
+                                    std::is_base_of_v<BasicService, Service>>>
+    void register_service(std::unique_ptr<Service> service) {
+        if (this->_services.count(typeid(Service))) {
+            // TODO: More detailed error information
+            throw ApplicationError("service duplicate");
+        }
+
+        this->dispatch_event(service);
+        this->subscribe_event(service);
+
+        this->_services.emplace(typeid(Service), std::move(service));
+    }
+
+    template <typename _Observer>
+    void dispatch_event(
+        const std::unique_ptr<_Observer> &observer,
+        typename std::enable_if_t<std::is_base_of_v<Observer, _Observer>> * =
+            0) {
+        observer->subscribe(this);
+    }
+
+    template <typename _Observer>
+    void dispatch_event(
+        const std::unique_ptr<_Observer> &,
+        typename std::enable_if_t<!std::is_base_of_v<Observer, _Observer>> * =
+            0) {}
+
+    template <typename _Observable>
+    void subscribe_event(
+        const std::unique_ptr<_Observable> &observable,
+        typename std::enable_if_t<std::is_base_of_v<Observable, _Observable>>
+            * = 0) {
+        observable->event_source().subscribe([this](auto e) { this->post(e); });
+    }
+
+    template <typename _Observable>
+    void subscribe_event(
+        const std::unique_ptr<_Observable> &,
+        typename std::enable_if_t<!std::is_base_of_v<Observable, _Observable>>
+            * = 0) {}
+
+    void parse_program_options(int argc, char **argv,
+                               const options_description &opts) {
         po::store(po::command_line_parser(argc, argv)
                       .options(opts)
                       .allow_unregistered()

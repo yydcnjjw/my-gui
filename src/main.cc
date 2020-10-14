@@ -14,8 +14,6 @@
 // #include <storage/image.hpp>
 // #include <storage/resource_mgr.hpp>
 
-#include <rx.hpp>
-
 // void test1(int argc, char *argv[]) {
 //     auto app = my::new_application(argc, argv, {});
 
@@ -181,28 +179,48 @@ class Node {
     IRect range;
 };
 
-class Scene : public tree<std::shared_ptr<my::Node>> {
-    
-};
+class Scene : public tree<std::shared_ptr<my::Node>> {};
 
 } // namespace my
 
 int main(int argc, char **argv) {
-    GLOG_D("run application");
+    GLOG_D("application run");
     auto app = my::Application::create(argc, argv);
+    auto win = app->service<my::WindowService>()
+                   ->create_window("test", {512, 512})
+                   .get();
 
-    rxcpp::observable<>::timer(std::chrono::seconds(3))
-        .subscribe_on(app->coordination())
-        .subscribe([&app](auto) {
-            GLOG_I("need exit!");
-            app->post<my::QuitEvent>();
-        });
+    auto win1 = app->service<my::WindowService>()
+                    ->create_window("test", {512, 512})
+                    .get();
 
-    my::Scene scene;
-    auto root = scene.set_head(my::Node::make());
-    auto i = scene.append_child(root, my::Node::make());
+    auto notify_close = [](auto e) {
+        switch (e->event) {
+        case SDL_WINDOWEVENT_CLOSE:
+            GLOG_D("%d window close", e->win->window_id());
+            break;
+        default:
+            GLOG_D("%d window event: %d", e->win->window_id(),
+                   static_cast<int>(e->event));
+            break;
+        }
+    };
 
+    auto error_handle = [](auto e) {
+        try {
+            std::rethrow_exception(e);
+        } catch (std::exception &e) {
+            GLOG_D(e.what());
+        }
+    };
+
+    my::on_event<my::WindowStateEvent>(win.get())
+        .observe_on(app->coordination())
+        .subscribe(notify_close, error_handle);
+    my::on_event<my::WindowStateEvent>(win1.get())
+        .observe_on(app->coordination())
+        .subscribe(notify_close, error_handle);
     app->run();
-    GLOG_I("exit!");
+    GLOG_D("application exit!");
     // std::this_thread::sleep_for(std::chrono::seconds(2));
 }

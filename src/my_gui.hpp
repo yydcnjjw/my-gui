@@ -9,7 +9,6 @@
 #include <boost/program_options.hpp>
 #include <boost/coroutine2/all.hpp>
 
-#include <util/async_task.hpp>
 #include <util/codecvt.hpp>
 #include <util/logger.h>
 #include <util/uuid.hpp>

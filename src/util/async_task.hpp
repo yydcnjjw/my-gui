@@ -13,12 +13,16 @@
 
 namespace my {
 
+template <typename T> using future = boost::future<T>;
+template <typename T> using promise = boost::promise<T>;
+
 class observe_on_one_thread {
   public:
     typedef std::thread::native_handle_type thread_type;
     typedef rxcpp::observe_on_one_worker coordination_type;
     typedef coordination_type::coordinator_type coordinator_type;
     typedef rxcpp::composite_subscription coordinator_state_type;
+
     observe_on_one_thread()
         : _coordinator(observe_on_one_thread::create_coordinator(
               this->_thread, this->_coordinator_state)) {}
@@ -31,10 +35,10 @@ class observe_on_one_thread {
         return rxcpp::observe_on_one_worker(this->_coordinator.get_scheduler());
     }
 
-    coordinator_type &coordinator() { return this->_coordinator; }
     coordinator_state_type &coordinator_state() {
         return this->_coordinator_state;
     }
+    coordinator_type &coordinator() { return this->_coordinator; }
 
     thread_type &thread() { return this->_thread; }
 
@@ -68,13 +72,7 @@ template <typename... Args> struct ServiceRequestEvent {
           params(std::forward<Args>(args)...) {}
 };
 
-class BasicService {
-  public:
-    observe_on_one_thread &coordination() { return this->coordination_; }
-
-    void exit() { this->coordination().coordinator_state().unsubscribe(); }
-
-    // virtual const std::string &name() = 0;
+// Experimental begin
 #define DECL_API(service, name, ret, args...) virtual ret name(args) = 0;
 
 #define DEFINE_API_INVOKE(service, name, ret, args...)                         \
@@ -97,6 +95,55 @@ class BasicService {
                       std::any (service::*)(std::shared_ptr<service>,          \
                                             std::shared_ptr<IEvent>)>          \
             api_map_{map(REGISTER_API)};
+// Experimental end
+
+class BasicService {
+  public:
+    virtual ~BasicService() = default;
+    observe_on_one_thread &coordination() { return this->coordination_; }
+
+    future<void> exit() {
+        return this->schedule<void>([this]() -> void {
+            this->coordination().coordinator_state().unsubscribe();
+        });
+    }
+
+  protected:
+    template <typename T, typename Func>
+    future<T> schedule(Func &&func,
+                       typename std::enable_if_t<std::is_void_v<T>> * = 0) {
+        auto p = std::make_shared<promise<T>>();
+        this->coordination().coordinator().get_worker().schedule(
+            [p, func](auto) {
+                try {
+                    func();
+                    p->set_value();
+                } catch (...) {
+                    try {
+                        p->set_exception(std::current_exception());
+                    } catch (...) {
+                    }
+                }
+            });
+        return p->get_future();
+    }
+    template <typename T, typename Func>
+    future<T> schedule(Func &&func,
+                       typename std::enable_if_t<!std::is_void_v<T>> * = 0) {
+        auto p = std::make_shared<promise<T>>();
+        this->coordination().coordinator().get_worker().schedule(
+            [p, func = std::forward<Func>(func)](auto) {
+                try {
+                    p->set_value(func());
+                } catch (...) {
+                    try {
+                        p->set_exception(std::current_exception());
+                    } catch (...) {
+                    }
+                }
+            });
+        return p->get_future();
+    }
 
   private:
     observe_on_one_thread coordination_;
@@ -116,9 +163,6 @@ template <class Fun> class y_combinator_result {
 template <class Fun> decltype(auto) y_combinator(Fun &&fun) {
     return y_combinator_result<Fun>(std::forward<Fun>(fun));
 }
-
-template <typename T> using future = boost::future<T>;
-template <typename T> using promise = boost::promise<T>;
 
 template <typename T>
 using async_callback = std::function<void(std::shared_ptr<promise<T>>)>;

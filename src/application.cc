@@ -23,24 +23,6 @@ class PosixApplication : public my::Application {
 
     ~PosixApplication() override {}
 
-    void run() override {
-        this->on_event<my::QuitEvent>()
-            .observe_on(this->coordination())
-            .subscribe([this](auto) { this->quit(); });
-
-        try {
-            this->_main_loop.run();
-        } catch (std::exception &e) {
-            GLOG_E(e.what());
-        }
-    }
-
-    void quit() override { this->_main_loop.quit(); }
-
-    coordination_type coordination() override {
-        return this->_main_loop.coordination();
-    }
-
     // my::EventBus *ev_bus() const override { return this->_ev_bus.get(); }
     // my::WindowMgr *win_mgr() const override { return this->_win_mgr.get(); };
     // my::FontMgr *font_mgr() const override { return this->_font_mgr.get(); }
@@ -67,7 +49,6 @@ class PosixApplication : public my::Application {
     // }
 
   private:
-    my::main_loop _main_loop;
 
     // std::unique_ptr<my::AsyncTask> _async_task;
     // std::unique_ptr<my::WindowMgr> _win_mgr;
