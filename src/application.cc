@@ -60,7 +60,7 @@ class PosixApplication : public my::Application {
 } // namespace
 
 namespace my {
-std::unique_ptr<Application>
+unique_ptr<Application>
 Application::create(int argc, char **argv,
                     const po::options_description &opts_desc) {
     return std::make_unique<PosixApplication>(argc, argv, opts_desc);

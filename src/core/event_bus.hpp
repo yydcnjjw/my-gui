@@ -1,10 +1,8 @@
 #pragma once
 
-#include <shared_mutex>
 #include <typeindex>
-#include <typeinfo>
 
-#include <rx.hpp>
+#include <core/config.hpp>
 
 namespace my {
 class IEvent {

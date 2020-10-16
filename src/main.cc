@@ -220,6 +220,7 @@ int main(int argc, char **argv) {
     my::on_event<my::WindowStateEvent>(win1.get())
         .observe_on(app->coordination())
         .subscribe(notify_close, error_handle);
+
     app->run();
     GLOG_D("application exit!");
     // std::this_thread::sleep_for(std::chrono::seconds(2));

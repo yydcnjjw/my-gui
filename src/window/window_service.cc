@@ -1,6 +1,4 @@
-#include "service.hpp"
-
-#include <util/event_bus.hpp>
+#include "window_service.hpp"
 
 #include <SDL2/SDL.h>
 

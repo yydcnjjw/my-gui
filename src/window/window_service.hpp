@@ -1,6 +1,8 @@
 #pragma once
 
-#include <util/async_task.hpp>
+#include <core/config.hpp>
+#include <core/basic_service.hpp>
+#include <core/event_bus.hpp>
 #include <window/event.hpp>
 
 namespace my {

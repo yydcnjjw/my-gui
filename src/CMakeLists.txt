@@ -15,13 +15,12 @@ set(my-gui_inc
 
 set(my-gui_src
   application.cc
-  util/logger.cc
-  util/uuid.cc
-  window/service.cc
-  storage/resource_mgr.cc
-  storage/resource.cc
-  storage/archive.cc
-  storage/xp3_archive.cc
+  core/logger.cc
+  window/window_service.cc
+  # storage/resource_mgr.cc
+  # storage/resource.cc
+  # storage/archive.cc
+  # storage/xp3_archive.cc
   # storage/font_mgr.cc
   # render/window/window_mgr.cc
   # render/canvas.cc

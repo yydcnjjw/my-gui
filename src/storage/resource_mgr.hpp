@@ -10,6 +10,7 @@
 #include <util/async_task.hpp>
 
 namespace my {
+    
 class ResourceMgr {
   public:
     ~ResourceMgr() = default;
