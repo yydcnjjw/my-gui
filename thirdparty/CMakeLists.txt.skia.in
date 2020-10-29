@@ -14,14 +14,14 @@ ExternalProject_Add(@dep_name@
   TEST_COMMAND ""
   )
 
-set(build_dir out/Release)
+set(build_dir out/Shared)
 
 add_custom_target(skia_build ALL
   COMMAND bin/fetch-gn
   COMMAND python2 tools/git-sync-deps
   COMMAND cp .gn back.gn
   COMMAND echo 'script_executable = \"python2\"' >> .gn
-  COMMAND bin/gn gen ${build_dir} --args='is_official_build=true'
+  COMMAND bin/gn gen ${build_dir} --args='is_official_build=true is_component_build=true'
   COMMAND ninja -C ${build_dir} -j 4
   COMMAND mv back.gn .gn
   COMMAND mkdir -p @DEPS_DIR@/include/skia/include

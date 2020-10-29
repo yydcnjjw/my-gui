@@ -7,9 +7,6 @@
 #include <boost/mp11.hpp>
 #include <boost/program_options.hpp>
 #include <boost/locale/encoding.hpp>
-#define BOOST_THREAD_PROVIDES_FUTURE
-#define BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
-#include <boost/thread/future.hpp>
 #include <rx.hpp>
 
 namespace my {
@@ -23,8 +20,8 @@ namespace mp11 = boost::mp11;
 
 namespace codecvt = boost::locale::conv;
 template <typename T> using coroutine = boost::coroutines2::coroutine<T>;
-template <typename T> using future = boost::future<T>;
-template <typename T> using promise = boost::promise<T>;
+template <typename T> using future = std::future<T>;
+template <typename T> using promise = std::promise<T>;
 
 namespace rx = rxcpp;
 

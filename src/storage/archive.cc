@@ -1,4 +1,4 @@
-#include "archive.h"
+#include "archive.hpp"
 
 namespace my {
 extern std::shared_ptr<Archive> open_xp3(const fs::path &path);

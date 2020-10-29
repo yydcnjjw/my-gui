@@ -5,8 +5,6 @@
 #include <skia/include/core/SkFont.h>
 #include <skia/include/core/SkSurface.h>
 
-#include <my_gui.hpp>
-
 namespace my {
 using IRect = SkIRect;
 using IPoint2D = SkIPoint;

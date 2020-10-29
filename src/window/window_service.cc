@@ -1,4 +1,5 @@
 #include "window_service.hpp"
+#include <window/exception.hpp>
 
 #include <SDL2/SDL.h>
 
@@ -167,17 +168,6 @@ class SDLWindow : public Window,
     Observable::observable_type _event_source;
 };
 
-class WindowServiceError : public std::runtime_error {
-  public:
-    WindowServiceError(const std::string &msg)
-        : std::runtime_error(msg), _msg(msg) {}
-
-    const char *what() const noexcept override { return this->_msg.c_str(); }
-
-  private:
-    std::string _msg;
-};
-
 class SDLWindowService : public WindowService {
     typedef WindowService base_type;
     typedef base_type::observable_type observable_type;
@@ -188,7 +178,8 @@ class SDLWindowService : public WindowService {
             throw WindowServiceError(SDL_GetError());
         }
         this->init_event_source();
-        pthread_setname_np(this->coordination().thread(), "window service");
+        pthread_setname_np(this->coordination().get_thread_info().handle,
+                           "window service");
     }
 
     observable_type event_source() override {

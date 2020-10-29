@@ -44,7 +44,7 @@ class Logger : public my::BasicService {
     typedef rxcpp::subjects::subject<shared_ptr<LogMsg>> observable_type;
 
     Logger();
-    ~Logger() { this->exit(); }
+    ~Logger() { this->logger_exit(); }
 
     void addLogOutputTarget(const shared_ptr<LoggerOutput> &output);
 
@@ -82,9 +82,8 @@ class Logger : public my::BasicService {
 
     observable_type &log_source() { return this->_log_source; }
 
-    void exit() {
-        this->log_source().get_observable().subscribe(
-            [](auto) {}, [this]() { base_type::exit().get(); });
+    void logger_exit() {
+        this->log_source().get_observable().subscribe();
         this->log_source().get_subscriber().on_completed();
     }
 };

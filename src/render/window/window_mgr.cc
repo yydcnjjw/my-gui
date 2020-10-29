@@ -1,14 +1,7 @@
 #include "window_mgr.h"
 
-#include <skia/include/gpu/GrBackendSurface.h>
-#include <skia/include/gpu/GrContext.h>
-#include <skia/include/gpu/gl/GrGLInterface.h>
-
-#include <GL/gl.h>
-
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
-#include <SDL2/SDL_vulkan.h>
 
 namespace {
 static const int stencil_bits{8};      // Skia needs 8 stencil bits

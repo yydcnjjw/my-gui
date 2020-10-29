@@ -48,7 +48,8 @@ Logger::Logger() {
     this->addLogOutputTarget(std::make_shared<StdLoggerOutput>(Logger::DEBUG));
     this->addLogOutputTarget(
         std::make_shared<FileLoggerOutput>("log.txt", Logger::DEBUG));
-    pthread_setname_np(this->coordination().thread(), "logger service");
+    pthread_setname_np(this->coordination().get_thread_info().handle,
+                       "logger service");
 }
 
 void Logger::addLogOutputTarget(const shared_ptr<LoggerOutput> &output) {

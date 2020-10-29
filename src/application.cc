@@ -1,8 +1,6 @@
-#include "application.h"
+#include "application.hpp"
 
 #include <sstream>
-
-#include <my_gui.hpp>
 
 namespace {
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <core/config.hpp>
 #include <core/basic_service.hpp>
 #include <core/event_bus.hpp>
 #include <window/event.hpp>
@@ -46,7 +45,7 @@ class WindowService : public BasicService, public Observable, public Observer {
   public:
     virtual ~WindowService() = default;
 
-    virtual future<std::shared_ptr<my::Window>>
+    virtual future<shared_ptr<my::Window>>
     create_window(const std::string &title, const my::ISize2D &size) = 0;
 
     virtual future<DisplayMode> display_mode() = 0;

@@ -1,15 +1,13 @@
 #include "archive.h"
 
 #include <cstring>
-#include <locale>
 
-#include <boost/format.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/stream.hpp>
 
-#include <my_gui.hpp>
+#include <core/logger.hpp>
 #include <storage/resource.hpp>
 
 namespace {
@@ -138,7 +136,7 @@ class XP3Archive : public my::Archive {
                 file_info->flag = info.flag;
                 std::u16string path(info.len, 0);
                 read(path.data(), info.len * 2);
-                auto utf8_path = codecvt::utf_to_utf<char>(path);
+                auto utf8_path = my::codecvt::utf_to_utf<char>(path);
                 std::replace(utf8_path.begin(), utf8_path.end(), '\\', '/');
                 file_info->path = utf8_path;
 

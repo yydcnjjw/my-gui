@@ -4,6 +4,7 @@
 #include <core/coordination.hpp>
 #include <core/event_bus.hpp>
 #include <core/logger.hpp>
+#include <storage/resource_service.hpp>
 #include <window/window_service.hpp>
 
 namespace my {
@@ -27,6 +28,7 @@ class Application : public EventBus {
         pthread_setname_np(pthread_self(), "application service");
         this->parse_program_options(argc, argv, opts_desc);
         this->register_service(WindowService::create());
+        this->register_service(ResourceService::create());
     };
 
     virtual ~Application() = default;

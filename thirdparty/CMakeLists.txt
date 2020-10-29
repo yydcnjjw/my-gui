@@ -54,14 +54,14 @@ set(rxcpp_DIR ${DEPS_DIR}/share/rxcpp/cmake CACHE INTERNAL "")
 # file(GLOB LLGL_lib ${LLGL_build_dir}/build/*)
 # set(LLGL_inc ${LLGL_src_dir}/include CACHE INTERNAL "")
 # set(LLGL_lib ${LLGL_lib} CACHE INTERNAL "")
-
+# set(dep_build_no_cache ON)
 # skia
 build_dep(skia)
 set(skia_inc
   ${DEPS_DIR}/include/skia
   CACHE INTERNAL "")
-set(skia_lib ${skia_src_dir}/out/Release/libskia.a CACHE INTERNAL "")
-
+set(skia_lib ${skia_src_dir}/out/Shared/libskia.so CACHE INTERNAL "")
+# set(dep_build_no_cache OFF)
 # oiio
 build_dep(oiio)
 set(OpenImageIO_DIR ${DEPS_DIR}/lib/cmake/OpenImageIO CACHE INTERNAL "")
