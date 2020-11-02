@@ -4,37 +4,41 @@
 #include <storage/image.hpp>
 
 namespace my {} // namespace my
-
+using namespace my;
 int main(int argc, char **argv) {
     // try {
     GLOG_D("application run");
-    auto app = my::Application::create(argc, argv);
+    auto app = Application::create(argc, argv);
 
-    auto win = app->service<my::WindowService>()
+    auto win = app->service<WindowService>()
                    ->create_window("my gui", {512, 512})
                    .get();
-    auto render = my::RenderService::make(win);
 
-    render->run_at([](my::RenderService *render) {
-        auto root = my::Node2D::make(my::ISize2D::Make(400, 400));
+    auto root = Node2D::make(ISize2D::Make(400, 400));
+    {
+
         SkPaint paint;
         {
             paint.setColor(SkColors::kBlue);
-            root->canvas()->drawIRect(my::IRect::MakeXYWH(0, 0, 400, 400),
-                                      paint);
+            root->canvas()->drawIRect(IRect::MakeXYWH(0, 0, 400, 400), paint);
         }
         {
-            auto sub_n =
-                my::Node2D::make(my::IRect::MakeXYWH(100, 100, 512, 512));
+            auto sub_n = Node2D::make(IRect::MakeXYWH(100, 100, 512, 512));
 
             sub_n->canvas()->clear(SkColors::kGray);
             paint.setColor(SkColors::kRed);
-            sub_n->canvas()->drawIRect(my::IRect::MakeWH(200, 200), paint);
+            sub_n->canvas()->drawIRect(IRect::MakeWH(200, 200), paint);
 
             root->add_sub_node(sub_n);
         }
-        render->root_node(root);
-    });
+    }
+
+    on_event<MouseButtonEvent>(win.get()).subscribe(
+        [](shared_ptr<Event<MouseButtonEvent>> e) { e->pos; });
+
+    auto render = RenderService::make(win);
+
+    render->run_at([root](RenderService *render) { render->root_node(root); });
 
     app->run();
     GLOG_D("application exit!");
