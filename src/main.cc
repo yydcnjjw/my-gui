@@ -40,10 +40,6 @@ int main(int argc, char **argv) {
 
     render->run_at([root](RenderService *render) { render->root_node(root); });
 
-    my::Scene scene;
-    auto root = scene.set_head(my::Node::make());
-    auto i = scene.append_child(root, my::Node::make());
-
     app->run();
     GLOG_D("application exit!");
     // } catch (std::exception &e) {

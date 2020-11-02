@@ -65,10 +65,6 @@ class EventBus : public Observable, public Observer {
         observable->event_source().subscribe([this](auto e) { this->post(e); });
     }
 
-    void subscribe(Observable *observable) override {
-        observable->event_source().subscribe([this](auto e) { this->post(e); });
-    }
-
     template <typename T, typename... Args> void post(Args &&... args) {
         this->post(Event<T>::make(std::forward<Args>(args)...));
     }
@@ -85,13 +81,6 @@ class EventBus : public Observable, public Observer {
   private:
     rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
 
-    observable_type event_source() override {
-        return this->_event_source.get_observable();
-    }
-
-    void post(std::shared_ptr<IEvent> e) {
-        this->_event_source.get_subscriber().on_next(e);
-    }
 };
 
 } // namespace my
