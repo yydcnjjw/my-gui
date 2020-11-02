@@ -1,14 +1,11 @@
 #pragma once
 
 #include <fstream>
-#include <typeindex>
-#include <typeinfo>
-#include <shared_mutex>
 
-#include <boost/noncopyable.hpp>
+#include <boost/format.hpp>
 
-#include <my_gui.hpp>
-#include <storage/archive.h>
+#include <core/config.hpp>
+#include <storage/archive.hpp>
 #include <util/uuid.hpp>
 
 namespace my {
@@ -28,9 +25,9 @@ class Resource : private boost::noncopyable {
     const uuid _uuid{uuid_gen()};
 };
 
-std::unique_ptr<std::ifstream> make_ifstream(const fs::path &path);
+unique_ptr<std::ifstream> make_ifstream(const fs::path &path);
 
-std::unique_ptr<std::ofstream> make_ofstream(const fs::path &path);
+unique_ptr<std::ofstream> make_ofstream(const fs::path &path);
 
 struct ResourceFileProvideInfo {
     fs::path path;
@@ -42,7 +39,7 @@ struct ResourceStreamProvideInfo {
      */
     size_t size{0};
     size_t offset{0};
-    std::unique_ptr<std::istream> is{};
+    unique_ptr<std::istream> is{};
     static ResourceStreamProvideInfo make(const ResourceFileProvideInfo &info) {
         return ResourceStreamProvideInfo{fs::file_size(info.path), info.offset,
                                          make_ifstream(info.path)};
@@ -70,7 +67,7 @@ class FSResourceLocator : public ResourceLocator {
 
     FSResourceLocator(const fs::path &path) : path(path) {}
 
-    static std::shared_ptr<FSResourceLocator> make(const fs::path &path) {
+    static shared_ptr<FSResourceLocator> make(const fs::path &path) {
         return std::make_shared<FSResourceLocator>(path);
     }
 
@@ -98,7 +95,7 @@ struct ResourceLocatorError : public std::invalid_argument {
 
 class XP3ResourceLocator : public ResourceLocator {
   public:
-    using archive_map = std::map<fs::path, std::shared_ptr<Archive>>;
+    using archive_map = std::map<fs::path, shared_ptr<Archive>>;
     using make_archive_map = std::map<std::string, Archive::make_archive_func>;
 
     fs::path archive_path;
@@ -107,8 +104,8 @@ class XP3ResourceLocator : public ResourceLocator {
     XP3ResourceLocator(const fs::path &archive_path, const fs::path &query_path)
         : archive_path(archive_path), query_path(query_path) {}
 
-    static std::shared_ptr<XP3ResourceLocator>
-    make(const fs::path &archive_path, const fs::path &query_path) {
+    static shared_ptr<XP3ResourceLocator> make(const fs::path &archive_path,
+                                               const fs::path &query_path) {
         return std::make_shared<XP3ResourceLocator>(archive_path, query_path);
     }
 
@@ -135,14 +132,20 @@ class XP3ResourceLocator : public ResourceLocator {
     }
 
   private:
-    static std::shared_mutex _lock;
-    static archive_map _archives;
     static const make_archive_map _supported_archives;
 
-    static std::optional<std::shared_ptr<Archive>>
-    archive_get_if_exist(const fs::path &path);
+    std::optional<shared_ptr<Archive>>
+    archive_get_if_exist(const fs::path &path) {
+        const auto extension = path.extension();
+        auto it = XP3ResourceLocator::_supported_archives.find(extension);
+        if (it != XP3ResourceLocator::_supported_archives.end() &&
+            FSResourceLocator::make(path)->exist()) {
+            return it->second(path);
+        }
+        return std::nullopt;
+    }
 
-    std::shared_ptr<Archive> archive_get() {
+    shared_ptr<Archive> archive_get() {
         auto archive =
             XP3ResourceLocator::archive_get_if_exist(this->archive_path);
         if (!archive.has_value()) {
@@ -160,7 +163,7 @@ class ResourceProvider {
     /**
      * @brief      load from fs
      */
-    static std::shared_ptr<res> load(const ResourceFileProvideInfo &) {
+    static shared_ptr<res> load(const ResourceFileProvideInfo &) {
         throw std::invalid_argument((boost::format("%1% can not be load") %
                                      ResourceProvider<res>::type().name)
                                         .str());
@@ -169,7 +172,7 @@ class ResourceProvider {
     /**
      * @brief      load from stream
      */
-    static std::shared_ptr<res> load(const ResourceStreamProvideInfo &) {
+    static shared_ptr<res> load(const ResourceStreamProvideInfo &) {
         throw std::invalid_argument((boost::format("%1% can not be load") %
                                      ResourceProvider<res>::type().name)
                                         .str());

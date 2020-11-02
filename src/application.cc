@@ -1,8 +1,6 @@
-#include "application.h"
+#include "application.hpp"
 
 #include <sstream>
-
-#include <my_gui.hpp>
 
 namespace {
 
@@ -22,24 +20,6 @@ class PosixApplication : public my::Application {
     {}
 
     ~PosixApplication() override {}
-
-    void run() override {
-        this->on_event<my::QuitEvent>()
-            .observe_on(this->coordination())
-            .subscribe([this](auto) { this->quit(); });
-
-        try {
-            this->_main_loop.run();
-        } catch (std::exception &e) {
-            GLOG_E(e.what());
-        }
-    }
-
-    void quit() override { this->_main_loop.quit(); }
-
-    coordination_type coordination() override {
-        return this->_main_loop.coordination();
-    }
 
     // my::EventBus *ev_bus() const override { return this->_ev_bus.get(); }
     // my::WindowMgr *win_mgr() const override { return this->_win_mgr.get(); };
@@ -67,7 +47,6 @@ class PosixApplication : public my::Application {
     // }
 
   private:
-    my::main_loop _main_loop;
 
     // std::unique_ptr<my::AsyncTask> _async_task;
     // std::unique_ptr<my::WindowMgr> _win_mgr;
@@ -79,7 +58,7 @@ class PosixApplication : public my::Application {
 } // namespace
 
 namespace my {
-std::unique_ptr<Application>
+unique_ptr<Application>
 Application::create(int argc, char **argv,
                     const po::options_description &opts_desc) {
     return std::make_unique<PosixApplication>(argc, argv, opts_desc);

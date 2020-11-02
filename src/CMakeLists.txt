@@ -3,6 +3,8 @@ set(COMPILE_FLAGS "-Wall -Wextra")
 set(CMAKE_C_FLAGS ${COMPILE_FLAGS})
 set(CMAKE_CXX_FLAGS ${COMPILE_FLAGS})
 
+add_compile_definitions(SK_GL)
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(my-gui_inc
   # build
@@ -15,13 +17,12 @@ set(my-gui_inc
 
 set(my-gui_src
   application.cc
-  util/logger.cc
-  util/uuid.cc
-  window/service.cc
-  storage/resource_mgr.cc
+  core/logger.cc
+  window/window_service.cc
   storage/resource.cc
   storage/archive.cc
   storage/xp3_archive.cc
+  render/render_service.cc
   # storage/font_mgr.cc
   # render/window/window_mgr.cc
   # render/canvas.cc
@@ -35,17 +36,10 @@ find_package(SDL2 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
   thread program_options iostreams locale timer coroutine)
 find_package(FFMPEG REQUIRED)
-find_package(Freetype REQUIRED)
-find_package(Fontconfig REQUIRED)
 # find_package(Vulkan REQUIRED)
-find_package(PNG REQUIRED)
-find_package(JPEG REQUIRED)
-find_package(webp REQUIRED)
-# find_package(cairo REQUIRED)
 find_package(OpenGL REQUIRED)
 
 # build
-# find_package(glm CONFIG REQUIRED)
 find_package(rxcpp CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 
@@ -64,23 +58,15 @@ set(DEPS
   SDL2::SDL2
   OpenGL::OpenGL
   OpenGL::GLX
-  # ${cairo_LIBRARIES}
-  ${FFMPEG_LIBRARIES}
-  ${webp_LIBRARIES}
-  Freetype::Freetype
-  Fontconfig::Fontconfig
+  # ${FFMPEG_LIBRARIES}
   # Vulkan::Vulkan
-  PNG::PNG
-  JPEG::JPEG
+  # ${webp_LIBRARIES}  
   ${boost_deps}
-  OpenImageIO::OpenImageIO
   # build
-  # glm::glm
   rxcpp
-  # ${LLGL_lib}
-  # ${msdfgen_lib}
   ${skia_lib}
   ${sdl2mixer_lib}
+  OpenImageIO::OpenImageIO
   )
 
 add_library(my-gui_lib SHARED ${my-gui_src})

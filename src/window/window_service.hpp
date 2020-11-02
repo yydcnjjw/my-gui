@@ -1,13 +1,12 @@
 #pragma once
-#include <memory>
-#include <util/async_task.hpp>
 
-#include <my_render.hpp>
+#include <core/basic_service.hpp>
+#include <core/event_bus.hpp>
 #include <window/event.hpp>
 
 namespace my {
 
-class Window {
+class Window : public Observable, public Observer {
   public:
     virtual ~Window() = default;
 
@@ -44,11 +43,14 @@ struct DisplayMode {
 
 class WindowService : public BasicService, public Observable, public Observer {
   public:
-#define SERVICE_MAP(XX)                                                        \
-    XX(WindowService, create_window, std::shared_ptr<Window>,                  \
-       const std::string &, const ISize2D &)
+    virtual ~WindowService() = default;
 
-    SERVICE_API(WindowService, SERVICE_MAP)
+    virtual future<shared_ptr<my::Window>>
+    create_window(const std::string &title, const my::ISize2D &size) = 0;
+
+    virtual future<DisplayMode> display_mode() = 0;
+    virtual future<Keymod> key_mod() = 0;
+    virtual future<MouseState> mouse_state() = 0;
 
     static std::unique_ptr<WindowService> create();
 };

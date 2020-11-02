@@ -1,10 +1,10 @@
 #pragma once
 
-#include <bitset>
 #include <boost/format.hpp>
 
-#include <util/async_task.hpp>
-
+#include <core/basic_service.hpp>
+#include <core/config.hpp>
+namespace my {
 class Logger : public my::BasicService {
     typedef my::BasicService base_type;
 
@@ -41,12 +41,12 @@ class Logger : public my::BasicService {
         Logger::Level limit_level;
     };
 
-    typedef rxcpp::subjects::subject<std::shared_ptr<LogMsg>> observable_type;
+    typedef rxcpp::subjects::subject<shared_ptr<LogMsg>> observable_type;
 
     Logger();
-    ~Logger() { this->exit(); }
+    ~Logger() { this->logger_exit(); }
 
-    void addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output);
+    void addLogOutputTarget(const shared_ptr<LoggerOutput> &output);
 
     template <typename... Args>
     void Log(Logger::Level type, const char *file_name, int file_len,
@@ -66,10 +66,10 @@ class Logger : public my::BasicService {
 
     static const std::string &to_level_str(Logger::Level l) {
         static const std::map<Logger::Level, const std::string> _level_str = {
-            {Logger::Level::DEBUG, "DEBUG"},
-            {Logger::Level::INFO, "INFO"},
-            {Logger::Level::WARN, "WARN"},
-            {Logger::Level::ERROR, "ERROR"}};
+            {Logger::DEBUG, "DEBUG"},
+            {Logger::INFO, "INFO"},
+            {Logger::WARN, "WARN"},
+            {Logger::ERROR, "ERROR"}};
         return _level_str.at(l);
     }
 
@@ -82,29 +82,28 @@ class Logger : public my::BasicService {
 
     observable_type &log_source() { return this->_log_source; }
 
-    void exit() {
-        this->log_source().get_observable().subscribe(
-            [](auto) {}, [this]() { base_type::exit(); });
+    void logger_exit() {
+        this->log_source().get_observable().subscribe();
         this->log_source().get_subscriber().on_completed();
     }
 };
-
+} // namespace my
 #define LOG_D(logger, fmt, args...)                                            \
-    (logger)->Log(Logger::Level::DEBUG, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::DEBUG, __FILE__, __LINE__, fmt, ##args)
 
 #define LOG_I(logger, fmt, args...)                                            \
-    (logger)->Log(Logger::Level::INFO, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::INFO, __FILE__, __LINE__, fmt, ##args)
 
 #define LOG_W(logger, fmt, args...)                                            \
-    (logger)->Log(Logger::Level::WARN, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::WARN, __FILE__, __LINE__, fmt, ##args)
 
 #define LOG_E(logger, fmt, args...)                                            \
-    (logger)->Log(Logger::Level::ERROR, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::ERROR, __FILE__, __LINE__, fmt, ##args)
 
-#define GLOG_D(fmt, args...) LOG_D(Logger::get(), fmt, ##args)
+#define GLOG_D(fmt, args...) LOG_D(my::Logger::get(), fmt, ##args)
 
-#define GLOG_I(fmt, args...) LOG_I(Logger::get(), fmt, ##args)
+#define GLOG_I(fmt, args...) LOG_I(my::Logger::get(), fmt, ##args)
 
-#define GLOG_W(fmt, args...) LOG_W(Logger::get(), fmt, ##args)
+#define GLOG_W(fmt, args...) LOG_W(my::Logger::get(), fmt, ##args)
 
-#define GLOG_E(fmt, args...) LOG_E(Logger::get(), fmt, ##args)
+#define GLOG_E(fmt, args...) LOG_E(my::Logger::get(), fmt, ##args)

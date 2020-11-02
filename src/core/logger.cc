@@ -1,15 +1,10 @@
-#include "logger.h"
-
-#include <cstdarg>
-#include <cstring>
+#include "logger.hpp"
 
 #include <fstream>
-#include <future>
 #include <iostream>
 
-#include <my_gui.hpp>
-
 namespace {
+using namespace my;
 class StdLoggerOutput : public Logger::LoggerOutput {
   public:
     explicit StdLoggerOutput(Logger::Level level = Logger::INFO)
@@ -47,21 +42,25 @@ class FileLoggerOutput : public Logger::LoggerOutput {
 
 } // namespace
 
+namespace my {
 Logger::Logger() {
     // init output target
     this->addLogOutputTarget(std::make_shared<StdLoggerOutput>(Logger::DEBUG));
     this->addLogOutputTarget(
         std::make_shared<FileLoggerOutput>("log.txt", Logger::DEBUG));
+    pthread_setname_np(this->coordination().get_thread_info().handle,
+                       "logger service");
 }
 
-void Logger::addLogOutputTarget(const std::shared_ptr<LoggerOutput> &output) {
+void Logger::addLogOutputTarget(const shared_ptr<LoggerOutput> &output) {
     this->log_source()
         .get_observable()
         .observe_on(this->coordination().get())
-        .filter([output, this](const std::shared_ptr<LogMsg> &msg) {
+        .filter([output, this](const shared_ptr<LogMsg> &msg) {
             return msg->level >= output->limit_level &&
                    msg->level >= this->_level;
         })
         .subscribe(
-            [output](const std::shared_ptr<LogMsg> &msg) { (*output)(*msg); });
+            [output](const shared_ptr<LogMsg> &msg) { (*output)(*msg); });
 }
+} // namespace my

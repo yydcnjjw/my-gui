@@ -1,7 +1,8 @@
 #pragma once
 
 #include <map>
-#include <my_gui.hpp>
+
+#include <core/config.hpp>
 
 namespace my {
 
