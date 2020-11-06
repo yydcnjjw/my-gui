@@ -29,6 +29,7 @@ int main(int argc, char **argv) {
             paint.setColor(SkColors::kRed);
             sub_n->canvas()->drawIRect(IRect::MakeWH(200, 200), paint);
 
+            
             root->add_sub_node(sub_n);
         }
     }
