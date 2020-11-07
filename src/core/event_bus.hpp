@@ -80,6 +80,7 @@ class EventBus : public Observable, public Observer {
 
   private:
     rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
+
 };
 
 } // namespace my
