@@ -9,7 +9,7 @@ class Logger : public my::BasicService {
     typedef my::BasicService base_type;
 
   public:
-    enum Level { DEBUG, INFO, WARN, ERROR };
+    enum Level { kDebug, kInfo, kWarn, kError };
 
     struct LogMsg {
         Logger::Level level;
@@ -35,7 +35,7 @@ class Logger : public my::BasicService {
 
     class LoggerOutput {
       public:
-        explicit LoggerOutput(Level level = INFO) : limit_level(level) {}
+        explicit LoggerOutput(Level level = kInfo) : limit_level(level) {}
         virtual void operator()(const Logger::LogMsg &msg) = 0;
         virtual ~LoggerOutput() = default;
         Logger::Level limit_level;
@@ -66,15 +66,15 @@ class Logger : public my::BasicService {
 
     static const std::string &to_level_str(Logger::Level l) {
         static const std::map<Logger::Level, const std::string> _level_str = {
-            {Logger::DEBUG, "DEBUG"},
-            {Logger::INFO, "INFO"},
-            {Logger::WARN, "WARN"},
-            {Logger::ERROR, "ERROR"}};
+            {Logger::kDebug, "DEBUG"},
+            {Logger::kInfo, "INFO"},
+            {Logger::kWarn, "WARN"},
+            {Logger::kError, "ERROR"}};
         return _level_str.at(l);
     }
 
   private:
-    Level _level{DEBUG};
+    Level _level{kDebug};
 
     std::set<rxcpp::composite_subscription> _output_targets;
 
@@ -89,16 +89,16 @@ class Logger : public my::BasicService {
 };
 } // namespace my
 #define LOG_D(logger, fmt, args...)                                            \
-    (logger)->Log(my::Logger::DEBUG, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::kDebug, __FILE__, __LINE__, fmt, ##args)
 
 #define LOG_I(logger, fmt, args...)                                            \
-    (logger)->Log(my::Logger::INFO, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::kInfo, __FILE__, __LINE__, fmt, ##args)
 
 #define LOG_W(logger, fmt, args...)                                            \
-    (logger)->Log(my::Logger::WARN, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::kWarn, __FILE__, __LINE__, fmt, ##args)
 
 #define LOG_E(logger, fmt, args...)                                            \
-    (logger)->Log(my::Logger::ERROR, __FILE__, __LINE__, fmt, ##args)
+    (logger)->Log(my::Logger::kError, __FILE__, __LINE__, fmt, ##args)
 
 #define GLOG_D(fmt, args...) LOG_D(my::Logger::get(), fmt, ##args)
 

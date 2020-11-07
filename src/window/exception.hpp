@@ -1,5 +1,7 @@
 #pragma once
-#include <core/config.hpp>
+
+#include <window/config.hpp>
+#include <window/type.hpp>
 
 namespace my {
 class WindowServiceError : public std::runtime_error {

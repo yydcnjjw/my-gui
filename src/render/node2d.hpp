@@ -41,9 +41,10 @@ class Node2D : public std::enable_shared_from_this<Node2D>, public Observer {
     std::list<shared_ptr<Node2D>> &sub_nodes() { return this->_sub_nodes; }
 
     bool disptach_mouse_button_event(shared_ptr<Event<MouseButtonEvent>> e) {
+        auto pos = e->pos;
+
+        
         for (auto sub_node : this->sub_nodes()) {
-            
-            
             
             if (sub_node->disptach_mouse_button_event(e)) {
                 return true;

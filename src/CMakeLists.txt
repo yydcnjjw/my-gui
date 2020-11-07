@@ -18,7 +18,6 @@ set(my-gui_inc
 set(my-gui_src
   application.cc
   core/logger.cc
-  window/window_service.cc
   storage/resource.cc
   storage/archive.cc
   storage/xp3_archive.cc

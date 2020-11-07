@@ -45,9 +45,9 @@ class FileLoggerOutput : public Logger::LoggerOutput {
 namespace my {
 Logger::Logger() {
     // init output target
-    this->addLogOutputTarget(std::make_shared<StdLoggerOutput>(Logger::DEBUG));
+    this->addLogOutputTarget(std::make_shared<StdLoggerOutput>(Logger::kDebug));
     this->addLogOutputTarget(
-        std::make_shared<FileLoggerOutput>("log.txt", Logger::DEBUG));
+        std::make_shared<FileLoggerOutput>("log.txt", Logger::kDebug));
     pthread_setname_np(this->coordination().get_thread_info().handle,
                        "logger service");
 }

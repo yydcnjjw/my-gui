@@ -28,12 +28,12 @@ class SDLRenderService : public RenderService {
 
     void draw_node2D(shared_ptr<Node2D> node) {
         auto parent = node->parent();
-        auto rect = parent ? parent->rect() : this->root_node()->rect();
+        auto region = parent ? parent->region() : this->root_node()->region();
         auto [l, t] = node->pos();
         auto snapshot = node->snapshot();
 
         this->canvas()->save();
-        this->canvas()->clipRect(rect);
+        this->canvas()->clipRect(region);
 
         this->canvas()->drawImage(snapshot, l, t);
 

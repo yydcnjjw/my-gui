@@ -18,7 +18,7 @@ struct XP3ArchiveHeader {
     uint64_t index_ofs;
 } __attribute__((packed));
 
-enum EncodeMethod { RAW = 0, ZLIB = 1 };
+enum EncodeMethod { kRaw = 0, kZlib = 1 };
 
 struct XP3ArchiveIndex {
     uint8_t encode_method : 3;
@@ -93,7 +93,7 @@ class XP3Archive : public my::Archive {
         XP3ArchiveIndex index;
         xp3_archive.read((char *)&index, sizeof(XP3ArchiveIndex));
         uint64_t index_size = index.index_size;
-        if (index.encode_method == EncodeMethod::ZLIB) {
+        if (index.encode_method == EncodeMethod::kZlib) {
             xp3_archive.read((char *)index.uncompress_size, sizeof(uint64_t));
             index_size = index.uncompress_size[0];
         }
@@ -159,7 +159,7 @@ class XP3Archive : public my::Archive {
                         .str());
             }
         }
-        GLOG_D("read size %d, index size %d", read_size, index_size);
+        kDebug;
     }
 
     ~XP3Archive() override {}
@@ -196,7 +196,7 @@ class XP3Archive : public my::Archive {
             this->_stream =
                 std::make_shared<boost::iostreams::filtering_istream>();
             this->_stream->exceptions(std::ifstream::failbit);
-            if (this->_current_segm->encode_method == EncodeMethod::ZLIB) {
+            if (this->_current_segm->encode_method == EncodeMethod::kZlib) {
                 this->_stream->push(boost::iostreams::zlib_decompressor());
             }
             this->_stream->push(*this->_archive);

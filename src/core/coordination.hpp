@@ -1,6 +1,7 @@
 #pragma once
 
 #include <core/config.hpp>
+#include <core/type.hpp>
 
 namespace my {
 

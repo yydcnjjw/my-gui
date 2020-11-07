@@ -1,7 +1,6 @@
 #pragma once
 
-#include <core/basic_service.hpp>
-#include <core/event_bus.hpp>
+#include <core/core.hpp>
 #include <window/event.hpp>
 
 namespace my {

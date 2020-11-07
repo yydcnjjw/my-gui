@@ -3,6 +3,7 @@
 #include <typeindex>
 
 #include <core/config.hpp>
+#include <core/type.hpp>
 
 namespace my {
 class IEvent {

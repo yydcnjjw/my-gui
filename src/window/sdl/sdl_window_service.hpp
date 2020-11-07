@@ -1,12 +1,11 @@
-#include "window_service.hpp"
+#pragma once
+#include <window/window_service.hpp>
 #include <window/exception.hpp>
 
 #include <SDL2/SDL.h>
 
-namespace {
-using namespace my;
-
-struct SDLEvent {
+namespace my {
+    struct SDLEvent {
     SDL_Event e;
 };
 
@@ -262,10 +261,7 @@ class SDLWindowService : public WindowService {
             .connect();
     }
 };
-} // namespace
-
-namespace my {
 std::unique_ptr<WindowService> WindowService::create() {
     return std::make_unique<SDLWindowService>();
 }
-} // namespace my
+}
