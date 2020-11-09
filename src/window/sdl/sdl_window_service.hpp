@@ -1,11 +1,11 @@
 #pragma once
-#include <window/window_service.hpp>
-#include <window/exception.hpp>
 
-#include <SDL2/SDL.h>
+#include <window/sdl/sdl_event.hpp>
+#include <window/window_service.hpp>
 
 namespace my {
-    struct SDLEvent {
+
+struct SDLEvent {
     SDL_Event e;
 };
 
@@ -105,55 +105,52 @@ class SDLWindow : public Window,
         this->_event_source =
             on_event<SDLEvent>(o)
                 .map([self = this->shared_from_this()](auto e) {
-                    SDL_Event &sdl_event = e->e;
+                    SDL_Event &sdl_event = (*e)->e;
                     std::shared_ptr<IEvent> event;
                     WindowID id;
                     switch (sdl_event.type) {
-                    case SDL_MOUSEMOTION:
-                        id = sdl_event.motion.windowID;
-                        event = Event<MouseMotionEvent>::make(
-                            self,
-                            IPoint2D::Make(sdl_event.motion.x,
-                                           sdl_event.motion.y),
-                            ISize2D::Make(sdl_event.motion.xrel,
-                                          sdl_event.motion.yrel),
-                            sdl_event.motion.state);
-                        break;
-                    case SDL_MOUSEWHEEL:
-                        id = sdl_event.wheel.windowID;
-                        event = Event<MoushWheelEvent>::make(
-                            self,
-                            IPoint2D{sdl_event.wheel.x, sdl_event.wheel.y},
-                            sdl_event.wheel.which, sdl_event.wheel.direction);
-                        break;
-                    case SDL_KEYUP:
-                    case SDL_KEYDOWN:
-                        id = sdl_event.key.windowID;
-                        event = Event<KeyboardEvent>::make(
-                            self, sdl_event.key.state,
-                            sdl_event.key.repeat != 0, sdl_event.key.keysym);
-                        break;
-                    case SDL_WINDOWEVENT:
-                        id = sdl_event.window.windowID;
-                        event = Event<WindowStateEvent>::make(
-                            self, sdl_event.window.event);
-                        break;
+                    // case SDL_MOUSEMOTION:
+                    //     id = sdl_event.motion.windowID;
+                    //     event = Event<MouseMotionEvent>::make(
+                    //         self,
+                    //         IPoint2D::Make(sdl_event.motion.x,
+                    //                        sdl_event.motion.y),
+                    //         ISize2D::Make(sdl_event.motion.xrel,
+                    //                       sdl_event.motion.yrel),
+                    //         sdl_event.motion.state);
+                    //     break;
+                    // case SDL_MOUSEWHEEL:
+                    //     id = sdl_event.wheel.windowID;
+                    //     event = Event<MoushWheelEvent>::make(
+                    //         self,
+                    //         IPoint2D{sdl_event.wheel.x, sdl_event.wheel.y},
+                    //         sdl_event.wheel.which,
+                    //         sdl_event.wheel.direction);
+                    //     break;
+                    // case SDL_KEYUP:
+                    // case SDL_KEYDOWN:
+                    //     id = sdl_event.key.windowID;
+                    //     event = Event<KeyboardEvent>::make(
+                    //         self, sdl_event.key.state,
+                    //         sdl_event.key.repeat != 0, sdl_event.key.keysym);
+                    //     break;
+                    // case SDL_WINDOWEVENT:
+                    //     id = sdl_event.window.windowID;
+                    //     event = Event<WindowStateEvent>::make(
+                    //         self, sdl_event.window.event);
+                    //     break;
                     case SDL_MOUSEBUTTONDOWN:
                     case SDL_MOUSEBUTTONUP:
                         id = sdl_event.button.windowID;
-                        event = Event<MouseButtonEvent>::make(
-                            self, sdl_event.button.which,
-                            sdl_event.button.button, sdl_event.button.state,
-                            sdl_event.button.clicks,
-                            IPoint2D{sdl_event.button.x, sdl_event.button.y});
+                        event = Event<SDLMouseButtonEvent>::make(
+                                    self, sdl_event.button)
+                                    ->cast_to<MouseButtonEvent>();
                         break;
                     }
                     return std::make_pair(id, event);
                 })
-                .filter([](auto event) {
-                    return event.first ==
-                           std::dynamic_pointer_cast<WindowEvent>(event.second)
-                               ->win->window_id();
+                .filter([self = this->shared_from_this()](auto event) {
+                    return event.first == self->window_id();
                 })
                 .map([](auto e) { return e.second; });
     }
@@ -220,17 +217,17 @@ class SDLWindowService : public WindowService {
         });
     }
 
-    future<Keymod> key_mod() override {
-        return this->schedule<Keymod>(
-            []() { return static_cast<Keymod>(SDL_GetModState()); });
-    }
-    future<MouseState> mouse_state() override {
-        return this->schedule<MouseState>([]() {
-            int x, y;
-            auto mask = SDL_GetMouseState(&x, &y);
-            return MouseState{mask, {x, y}};
-        });
-    }
+    // future<Keymod> key_mod() override {
+    //     return this->schedule<Keymod>(
+    //         []() { return static_cast<Keymod>(SDL_GetModState()); });
+    // }
+    // future<MouseState> mouse_state() override {
+    //     return this->schedule<MouseState>([]() {
+    //         int x, y;
+    //         auto mask = SDL_GetMouseState(&x, &y);
+    //         return MouseState{mask, {x, y}};
+    //     });
+    // }
 
   private:
     rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
@@ -242,8 +239,8 @@ class SDLWindowService : public WindowService {
                 std::vector<std::shared_ptr<IEvent>> v;
                 while (true) {
                     auto e = Event<SDLEvent>::make();
-                    if (SDL_PollEvent(&e->e)) {
-                        switch (e->e.type) {
+                    if (SDL_PollEvent(&(*e)->e)) {
+                        switch ((*e)->e.type) {
                         case SDL_QUIT:
                             v.push_back(Event<QuitEvent>::make());
                             break;
@@ -264,4 +261,4 @@ class SDLWindowService : public WindowService {
 std::unique_ptr<WindowService> WindowService::create() {
     return std::make_unique<SDLWindowService>();
 }
-}
+} // namespace my

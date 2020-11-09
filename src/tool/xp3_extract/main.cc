@@ -42,7 +42,6 @@ int main(int argc, char *argv[]) {
     auto xp3_archive = xp3_make(src_path);
 
     auto xp3_ofs = my::make_ofstream("xp3_files.txt");
-    kDebug;
     for (auto &file_name : xp3_archive->list_files()) {
         auto path = extract_path / my::fs::path(file_name);
         *xp3_ofs << path << std::endl;

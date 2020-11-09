@@ -2,7 +2,7 @@
 
 #include <map>
 
-#include <core/config.hpp>
+#include <core/core.hpp>
 
 namespace my {
 

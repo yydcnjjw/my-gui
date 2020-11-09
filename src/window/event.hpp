@@ -1,6 +1,8 @@
 #pragma once
 
+#include <core/core.hpp>
 #include <window/type.hpp>
+#include <window/window_instance.hpp>
 
 namespace my {
 
@@ -9,8 +11,6 @@ namespace my {
 //     IPoint2D pos;
 //     MouseState(uint32_t mask, IPoint2D pos) : mask(mask), pos(pos) {}
 // };
-class Window;
-using WidnowPtr = std::shared_ptr<Window>;
 
 // struct WindowEvent {
 //     WidnowPtr win;
@@ -45,34 +45,45 @@ using WidnowPtr = std::shared_ptr<Window>;
 //         : WindowEvent(win), state(state), repeat(repeat), keysym(keysym) {}
 // };
 
-    struct WindowPtr {
-        
-    };
-    
-struct MouseButtonEvent {
-
+struct MouseButtonEvent
+    : public GetWindowPtr,
+      public std::enable_shared_from_this<MouseButtonEvent> {
     enum ButtonType { kLeft, kMiddle, kRight, kX1, kX2 };
-
     enum ButtonState { kPressed, kReleased };
 
-    ButtonState state;
-    ButtonType button;
-    uint8_t clicks;
-    IPoint2D pos;
+    inline shared_ptr<MouseButtonEvent> make_translate(IPoint2D translate);
 
-    // uint32_t which;
+    virtual ButtonType button_type() = 0;
+    virtual ButtonState button_state() = 0;
+    virtual uint8_t clicks() = 0;
+    virtual IPoint2D pos() = 0;
 
-    bool is_pressed() { return this->state == kPressed; }
-    bool is_released() { return this->state == kReleased; }
+    bool is_pressed() { return this->button_state() == kPressed; }
+    bool is_released() { return this->button_state() == kReleased; }
 
-    bool is_single_click() { return this->clicks == 1; }
-    bool is_double_click() { return this->clicks == 2; }
-
-    MouseButtonEvent(WidnowPtr win, uint32_t which, uint8_t button,
-                     uint8_t state, uint8_t clicks, IPoint2D pos)
-        : WindowEvent(win), which(which), button(button), state(state),
-          clicks(clicks), pos(pos) {}
+    MouseButtonEvent(WindowPtr ptr) : GetWindowPtr(ptr) {}
 };
+
+struct MouseButtonEventWithTranslate : public MouseButtonEvent {
+    MouseButtonEventWithTranslate(shared_ptr<MouseButtonEvent> e,
+                                  IPoint2D translate)
+        : MouseButtonEvent(e->window_ptr()), _e(e), _translate(translate) {}
+
+    ButtonType button_type() override { return this->_e->button_type(); }
+    ButtonState button_state() override { return this->_e->button_state(); }
+    uint8_t clicks() override { return this->_e->clicks(); }
+    IPoint2D pos() override { return this->_e->pos() + this->_translate; }
+
+  private:
+    shared_ptr<MouseButtonEvent> _e;
+    IPoint2D _translate;
+};
+
+shared_ptr<MouseButtonEvent>
+MouseButtonEvent::make_translate(IPoint2D translate) {
+    return std::make_shared<MouseButtonEventWithTranslate>(
+        this->shared_from_this(), translate);
+}
 
 // struct WindowStateEvent : public WindowEvent {
 

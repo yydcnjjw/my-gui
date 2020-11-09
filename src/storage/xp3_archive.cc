@@ -159,7 +159,6 @@ class XP3Archive : public my::Archive {
                         .str());
             }
         }
-        kDebug;
     }
 
     ~XP3Archive() override {}

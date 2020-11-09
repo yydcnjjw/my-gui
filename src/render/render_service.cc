@@ -3,6 +3,7 @@
 #include <stack>
 
 #include <GL/gl.h>
+#include <SDL2/SDL.h>
 
 #include <skia/include/core/SkSurface.h>
 #include <skia/include/gpu/GrBackendSurface.h>
@@ -28,12 +29,13 @@ class SDLRenderService : public RenderService {
 
     void draw_node2D(shared_ptr<Node2D> node) {
         auto parent = node->parent();
-        auto region = parent ? parent->region() : this->root_node()->region();
+        auto region = parent ? parent->rect() : this->root_node()->rect();
         auto [l, t] = node->pos();
         auto snapshot = node->snapshot();
 
         this->canvas()->save();
         this->canvas()->clipRect(region);
+        this->canvas()->translate(0, 0);
 
         this->canvas()->drawImage(snapshot, l, t);
 

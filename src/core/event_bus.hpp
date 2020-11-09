@@ -20,16 +20,33 @@ class IEvent {
     std::type_index _type;
 };
 
-template <typename DataType> class Event : public IEvent, public DataType {
+template <typename DataType> class Event : public IEvent {
   public:
     typedef DataType data_type;
     template <typename... Args>
     Event(Args &&... args)
-        : IEvent(typeid(data_type)), data_type(std::forward<Args>(args)...) {}
+        : IEvent(typeid(data_type)),
+          _data(std::make_shared<data_type>(std::forward<Args>(args)...)) {}
+
+    Event(shared_ptr<data_type> data)
+        : IEvent(typeid(data_type)), _data(data) {}
 
     template <typename... Args> static decltype(auto) make(Args &&... args) {
         return std::make_shared<Event>(std::forward<Args>(args)...);
     }
+
+    template <typename T,
+              typename = std::enable_if_t<std::is_base_of_v<T, data_type>>>
+    decltype(auto) cast_to() {
+        return Event<T>::make(std::reinterpret_pointer_cast<T>(this->data()));
+    }
+
+    data_type *operator->() const noexcept { return this->_data.get(); }
+
+    shared_ptr<data_type> data() { return this->_data; }
+
+  private:
+    shared_ptr<data_type> _data;
 };
 
 struct Observable {
@@ -81,7 +98,6 @@ class EventBus : public Observable, public Observer {
 
   private:
     rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
-
 };
 
 } // namespace my

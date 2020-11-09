@@ -7,12 +7,12 @@ namespace {
 using namespace my;
 class StdLoggerOutput : public Logger::LoggerOutput {
   public:
-    explicit StdLoggerOutput(Logger::Level level = Logger::INFO)
+    explicit StdLoggerOutput(Logger::Level level = Logger::kInfo)
         : Logger::LoggerOutput(level) {}
     ~StdLoggerOutput() override = default;
     void operator()(const Logger::LogMsg &msg) override {
         std::cout << msg.format() << std::endl;
-        if (msg.level == Logger::ERROR) {
+        if (msg.level == Logger::kError) {
             std::terminate();
         }
     };
@@ -21,7 +21,7 @@ class StdLoggerOutput : public Logger::LoggerOutput {
 class FileLoggerOutput : public Logger::LoggerOutput {
   public:
     explicit FileLoggerOutput(const my::fs::path &path,
-                              Logger::Level level = Logger::INFO)
+                              Logger::Level level = Logger::kInfo)
         : Logger::LoggerOutput(level) {
         my::fs::remove(path);
         this->_ofs.exceptions(std::ios::failbit | std::ios::badbit);
@@ -31,7 +31,7 @@ class FileLoggerOutput : public Logger::LoggerOutput {
     void operator()(const Logger::LogMsg &msg) override {
         this->_ofs << msg.format() << std::endl;
         this->_ofs.flush();
-        if (msg.level == Logger::ERROR) {
+        if (msg.level == Logger::kError) {
             std::terminate();
         }
     };

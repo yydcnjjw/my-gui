@@ -1,15 +1,15 @@
 #pragma once
-#include <core/config.hpp>
-#include <core/event_bus.hpp>
-#include <window/event.hpp>
 
-#include <my_render.hpp>
+#include <core/core.hpp>
+#include <window/window.hpp>
+
+#include <render/type.hpp>
 
 namespace my {
 class Node {
     virtual ~Node() = default;
 };
-class Node2D : public std::enable_shared_from_this<Node2D>, public Observer {
+class Node2D : public std::enable_shared_from_this<Node2D> {
   public:
     Node2D(IRect const &rect)
         : _pos(rect.topLeft()), _size(rect.size()),
@@ -31,7 +31,7 @@ class Node2D : public std::enable_shared_from_this<Node2D>, public Observer {
     shared_ptr<Node2D> parent() const { return this->_parent; }
     void parent(shared_ptr<Node2D> parent) { this->_parent = parent; }
 
-    Rect region() { return Rect::Make(this->i_region()); }
+    Rect rect() { return Rect::Make(this->irect()); }
 
     void add_sub_node(shared_ptr<Node2D> n) {
         n->parent(this->shared_from_this());
@@ -40,22 +40,31 @@ class Node2D : public std::enable_shared_from_this<Node2D>, public Observer {
 
     std::list<shared_ptr<Node2D>> &sub_nodes() { return this->_sub_nodes; }
 
-    bool disptach_mouse_button_event(shared_ptr<Event<MouseButtonEvent>> e) {
-        auto pos = e->pos;
-
-        
-        for (auto sub_node : this->sub_nodes()) {
-            
-            if (sub_node->disptach_mouse_button_event(e)) {
-                return true;
-            }
-
-            // on mouse button event
-        }
+    template <typename Callback> void set_mouse_button_listener(Callback &&cb) {
+        this->_mouse_button_listener = cb;
     }
 
-    void subscribe(Observable *o) override {
-        this->_event_source = o->event_source();
+    bool disptach_mouse_button_event(shared_ptr<Event<MouseButtonEvent>> e) {
+        auto pos = (*e)->pos();
+        auto rect = this->rect();
+
+        if (this->parent() && !rect.intersect(this->parent()->rect())) {
+            return false;
+        }
+
+        if (!rect.contains(pos.x(), pos.y())) {
+            return false;
+        }
+
+        for (auto sub_node : this->sub_nodes()) {
+            auto transalte_e = Event<MouseButtonEvent>::make(
+                (*e)->make_translate(this->pos()));
+            if (sub_node->disptach_mouse_button_event(transalte_e)) {
+                return true;
+            }
+        }
+        // on mouse button event
+        return this->on_mouse_button(e);
     }
 
   private:
@@ -67,13 +76,43 @@ class Node2D : public std::enable_shared_from_this<Node2D>, public Observer {
     sk_sp<SkSurface> _surface;
 
     // event
-    Observable::observable_type _event_source;
+    using mouse_button_listener_type =
+        std::function<bool(shared_ptr<Event<MouseButtonEvent>> e)>;
+    mouse_button_listener_type _mouse_button_listener;
 
-    IRect i_region() {
+    bool on_mouse_button(shared_ptr<Event<MouseButtonEvent>> e) {
+        if (this->_mouse_button_listener) {
+            return this->_mouse_button_listener(e);
+        }
+        return false;
+    }
+
+    IRect irect() {
         auto [x, y] = this->pos();
         auto [w, h] = this->size();
         return IRect::MakeXYWH(x, y, w, h);
-    }    
+    }
+};
+
+class RootNode2D : public Node2D, public Observer {
+  public:
+    template <typename... Args>
+    RootNode2D(Args &&... args) : Node2D(std::forward<Args>(args)...) {}
+
+    template <typename... Args>
+    static shared_ptr<RootNode2D> make_root(Args &&... args) {
+        return std::make_shared<RootNode2D>(std::forward<Args>(args)...);
+    }
+    void subscribe(Observable *o) override {
+        on_event<MouseButtonEvent>(o).subscribe(
+            [self = this->shared_from_this()](auto e) {
+                self->disptach_mouse_button_event(e);
+            });
+    }
+
+  private:
+    using Node2D::make;
+    using Node2D::parent;
 };
 
 } // namespace my
