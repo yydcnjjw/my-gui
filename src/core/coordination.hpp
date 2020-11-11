@@ -12,6 +12,10 @@ struct thread_info {
         : handle(thread.native_handle()), thread_id(thread.get_id()) {}
     handle_type handle;
     thread_id_type thread_id;
+
+    bool at_this_thread() {
+        return this->thread_id == std::this_thread::get_id();
+    }
 };
 
 class observe_on_one_thread {

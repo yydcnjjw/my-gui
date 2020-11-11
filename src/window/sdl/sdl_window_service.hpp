@@ -161,12 +161,11 @@ class SDLWindow : public Window,
 
     bool _is_visible{true};
 
-    Observable::observable_type _event_source;
+    observable_type _event_source;
 };
 
 class SDLWindowService : public WindowService {
-    typedef WindowService base_type;
-    typedef base_type::observable_type observable_type;
+    using base_type = WindowService;
 
   public:
     SDLWindowService() {
@@ -182,11 +181,13 @@ class SDLWindowService : public WindowService {
         return this->_event_source.get_observable();
     }
 
-    void subscribe(Observable *source) override { source->event_source(); }
+    void subscribe(MY_UNUSED Observable *o) override {
+        // source->event_source();
+    }
 
     future<std::shared_ptr<Window>>
     create_window(const std::string &title, const ISize2D &size) override {
-        return this->schedule<std::shared_ptr<Window>>([&]() {
+        return this->schedule<shared_ptr<Window>>([&]() {
             auto [w, h] = size;
             SDL_Window *sdl_win =
                 SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_UNDEFINED,
@@ -230,13 +231,13 @@ class SDLWindowService : public WindowService {
     // }
 
   private:
-    rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
+    subject_dynamic_event_type _event_source;
 
     void init_event_source() {
         rxcpp::observable<>::interval(std::chrono::milliseconds(100),
                                       this->coordination().get())
             .flat_map([](auto) {
-                std::vector<std::shared_ptr<IEvent>> v;
+                std::vector<shared_ptr<IEvent>> v;
                 while (true) {
                     auto e = Event<SDLEvent>::make();
                     if (SDL_PollEvent(&(*e)->e)) {
@@ -252,7 +253,7 @@ class SDLWindowService : public WindowService {
                         break;
                     }
                 }
-                return rxcpp::observable<>::iterate(v);
+                return rx::observable<>::iterate(v);
             })
             .multicast(this->_event_source)
             .connect();

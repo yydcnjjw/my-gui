@@ -17,20 +17,20 @@ int main(int argc, char **argv) {
         SkPaint paint;
         {
             paint.setColor(SkColors::kBlue);
-            root->canvas()->drawIRect(IRect::MakeXYWH(0, 0, 400, 400), paint);
+            root->canvas().drawIRect(IRect::MakeXYWH(0, 0, 400, 400), paint);
         }
         {
             auto sub_n = Node2D::make(IRect::MakeXYWH(100, 100, 512, 512));
 
-            sub_n->set_mouse_button_listener(
-                [](shared_ptr<Event<MouseButtonEvent>> e) {
-                    GLOG_D("%d %d", (*e)->pos().x(), (*e)->pos().y());
-                    return true;
+            sub_n->bind_event<MouseButtonEvent>(
+                [](observable_event_type<MouseButtonEvent> o) {
+                    return o.subscribe([](event_type<MouseButtonEvent> e) {
+                        GLOG_D("%d %d", (*e)->pos().x(), (*e)->pos().y());
+                    });
                 });
-            sub_n->canvas()->clear(SkColors::kGray);
+            sub_n->canvas().clear(SkColors::kGray);
             paint.setColor(SkColors::kRed);
-            sub_n->canvas()->drawIRect(IRect::MakeWH(200, 200), paint);
-
+            sub_n->canvas().drawIRect(IRect::MakeWH(200, 200), paint);
             root->add_sub_node(sub_n);
         }
     }

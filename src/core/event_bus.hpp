@@ -20,7 +20,11 @@ class IEvent {
     std::type_index _type;
 };
 
-template <typename DataType> class Event : public IEvent {
+using shared_event_type = shared_ptr<IEvent>;
+
+template <typename DataType>
+class Event : public IEvent,
+              public std::enable_shared_from_this<Event<DataType>> {
   public:
     typedef DataType data_type;
     template <typename... Args>
@@ -41,6 +45,10 @@ template <typename DataType> class Event : public IEvent {
         return Event<T>::make(std::reinterpret_pointer_cast<T>(this->data()));
     }
 
+    shared_event_type as_dynamic() {
+        return std::reinterpret_pointer_cast<IEvent>(this->shared_from_this());
+    }
+
     data_type *operator->() const noexcept { return this->_data.get(); }
 
     shared_ptr<data_type> data() { return this->_data; }
@@ -49,8 +57,14 @@ template <typename DataType> class Event : public IEvent {
     shared_ptr<data_type> _data;
 };
 
+template <typename DataType> using event_type = shared_ptr<Event<DataType>>;
+using observable_dynamic_event_type = rx::observable<shared_event_type>;
+template <typename EventDataType>
+using observable_event_type = rx::observable<event_type<EventDataType>>;
+using subject_dynamic_event_type = rx::subjects::subject<shared_event_type>;
+
 struct Observable {
-    using observable_type = rxcpp::observable<std::shared_ptr<IEvent>>;
+    using observable_type = observable_dynamic_event_type;
     virtual ~Observable() = default;
     virtual observable_type event_source() = 0;
 };
@@ -76,7 +90,7 @@ class EventBus : public Observable, public Observer {
 
   public:
     observable_type event_source() override {
-        return this->_event_source.get_observable();
+        return this->_subject.get_observable();
     }
 
     void subscribe(Observable *observable) override {
@@ -92,12 +106,12 @@ class EventBus : public Observable, public Observer {
     }
 
   protected:
-    void post(std::shared_ptr<IEvent> e) {
-        this->_event_source.get_subscriber().on_next(e);
+    void post(shared_event_type e) {
+        this->_subject.get_subscriber().on_next(e);
     }
 
   private:
-    rxcpp::subjects::subject<std::shared_ptr<IEvent>> _event_source;
+    subject_dynamic_event_type _subject;
 };
 
 } // namespace my

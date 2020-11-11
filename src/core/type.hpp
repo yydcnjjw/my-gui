@@ -4,9 +4,9 @@
 #include <memory>
 
 #include <boost/coroutine2/all.hpp>
+#include <boost/locale/encoding.hpp>
 #include <boost/mp11.hpp>
 #include <boost/program_options.hpp>
-#include <boost/locale/encoding.hpp>
 #include <rx.hpp>
 
 namespace my {

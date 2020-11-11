@@ -24,7 +24,7 @@ class Application : public EventBus {
   public:
     using coordination_type = main_loop::coordination_type;
     using options_description = po::options_description;
-    Application(int argc, char **argv, const options_description &opts_desc) {
+    Application(int argc, char **argv, options_description const &opts_desc) {
         pthread_setname_np(pthread_self(), "application service");
         this->parse_program_options(argc, argv, opts_desc);
         this->register_service(WindowService::create());
@@ -60,7 +60,7 @@ class Application : public EventBus {
             this->_services.at(typeid(Service)).get());
     }
 
-    bool get_program_option(const std::string &option,
+    bool get_program_option(std::string const &option,
                             po::variable_value &value) const {
         if (this->_program_option_map.count(option)) {
             value = this->_program_option_map[option];
@@ -71,7 +71,7 @@ class Application : public EventBus {
     }
 
     static unique_ptr<Application> create(int argc, char **argv,
-                                          const options_description & = {});
+                                          options_description const & = {});
 
   private:
     my::main_loop _main_loop;
@@ -95,7 +95,7 @@ class Application : public EventBus {
 
     template <typename _Observer>
     void dispatch_event(
-        const unique_ptr<_Observer> &observer,
+        unique_ptr<_Observer> const &observer,
         typename std::enable_if_t<std::is_base_of_v<Observer, _Observer>> * =
             0) {
         observer->subscribe(this);
@@ -103,26 +103,26 @@ class Application : public EventBus {
 
     template <typename _Observer>
     void dispatch_event(
-        const unique_ptr<_Observer> &,
+        unique_ptr<_Observer> const &,
         typename std::enable_if_t<!std::is_base_of_v<Observer, _Observer>> * =
             0) {}
 
     template <typename _Observable>
     void subscribe_event(
-        const unique_ptr<_Observable> &observable,
+        unique_ptr<_Observable> const &observable,
         typename std::enable_if_t<std::is_base_of_v<Observable, _Observable>>
             * = 0) {
-        observable->event_source().subscribe([this](auto e) { this->post(e); });
+        this->subscribe(observable.get());
     }
 
     template <typename _Observable>
     void subscribe_event(
-        const unique_ptr<_Observable> &,
+        unique_ptr<_Observable> const &,
         typename std::enable_if_t<!std::is_base_of_v<Observable, _Observable>>
             * = 0) {}
 
     void parse_program_options(int argc, char **argv,
-                               const options_description &opts) {
+                               options_description const &opts) {
         po::store(po::command_line_parser(argc, argv)
                       .options(opts)
                       .allow_unregistered()

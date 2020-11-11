@@ -8,8 +8,7 @@
 #define DECL_API(service, name, ret, args...) virtual ret name(args) = 0;
 
 #define DEFINE_API_INVOKE(service, name, ret, args...)                         \
-    std::any invoke_##name(std::shared_ptr<service> self,                      \
-                           std::shared_ptr<IEvent> e) {                        \
+    std::any invoke_##name(shared_ptr<service> self, shared_ptr<IEvent> e) {   \
         return std::apply(                                                     \
             static_cast<ret (service::*)(args)>(&service::name),               \
             std::tuple_cat(                                                    \
@@ -23,9 +22,8 @@
 
 #define SERVICE_API(service, map)                                              \
     map(DECL_API) map(DEFINE_API_INVOKE)                                       \
-        std::multimap<std::string,                                             \
-                      std::any (service::*)(std::shared_ptr<service>,          \
-                                            std::shared_ptr<IEvent>)>          \
+        std::multimap<std::string, std::any (service::*)(shared_ptr<service>,  \
+                                                         shared_ptr<IEvent>)>  \
             api_map_{map(REGISTER_API)};
 // Experimental end
 
