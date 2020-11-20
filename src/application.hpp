@@ -21,17 +21,19 @@ class ApplicationError : public std::runtime_error {
 };
 
 class Application : public EventBus {
+    using self_type = Application;
+
   public:
     using coordination_type = main_loop::coordination_type;
     using options_description = po::options_description;
-    Application(int argc, char **argv, options_description const &opts_desc) {
-        pthread_setname_np(pthread_self(), "application service");
-        this->parse_program_options(argc, argv, opts_desc);
-        this->register_service(WindowService::create());
-        this->register_service(ResourceService::create());
-    };
 
     virtual ~Application() = default;
+
+    static Application *get() {
+        assert(Application::_instance);
+        return Application::_instance;
+    }
+
     void run() {
         on_event<my::QuitEvent>(this)
             .observe_on(this->coordination())
@@ -73,7 +75,21 @@ class Application : public EventBus {
     static unique_ptr<Application> create(int argc, char **argv,
                                           options_description const & = {});
 
+  protected:
+    Application(int argc, char **argv, options_description const &opts_desc) {
+        if (this->_instance) {
+            throw ApplicationError("Application can only have one instance!");
+        }
+        this->_instance = this;
+
+        pthread_setname_np(pthread_self(), "application service");
+        this->parse_program_options(argc, argv, opts_desc);
+        this->register_service(WindowService::create());
+        this->register_service(ResourceService::create());
+    };
+
   private:
+    static self_type *_instance;
     my::main_loop _main_loop;
     options_description _opts_desc;
     po::variables_map _program_option_map;

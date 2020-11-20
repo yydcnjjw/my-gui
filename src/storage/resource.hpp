@@ -4,7 +4,7 @@
 
 #include <boost/format.hpp>
 
-#include <core/config.hpp>
+#include <core/core.hpp>
 #include <storage/archive.hpp>
 #include <util/uuid.hpp>
 

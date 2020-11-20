@@ -12,12 +12,13 @@ int main(int argc, char **argv) {
                    ->create_window("my gui", {512, 512})
                    .get();
 
-    auto root = RootNode2D::make_root(ISize2D::Make(400, 400));
+    auto tree = Node2DTree::make();
     {
+        auto root = Node2D::make(IRect::MakeSize({400, 400}));
         SkPaint paint;
         {
             paint.setColor(SkColors::kBlue);
-            root->canvas().drawIRect(IRect::MakeXYWH(0, 0, 400, 400), paint);
+            root->canvas().drawIRect(IRect::MakeSize({400, 400}), paint);
         }
         {
             auto sub_n = Node2D::make(IRect::MakeXYWH(100, 100, 512, 512));
@@ -33,13 +34,18 @@ int main(int argc, char **argv) {
             sub_n->canvas().drawIRect(IRect::MakeWH(200, 200), paint);
             root->add_sub_node(sub_n);
         }
+        tree->connect(root);
+        root->connect(tree);
     }
 
     auto render = RenderService::make(win);
 
-    render->run_at([root](RenderService *render) { render->root_node(root); });
+    render->run_at([tree](RenderService *render) {
+        tree->connect(render);
+        render->connect(tree);
+    });
 
-    root->subscribe(win.get());
+    tree->subscribe(win.get());
 
     app->run();
     GLOG_D("application exit!");

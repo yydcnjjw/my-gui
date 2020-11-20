@@ -6,33 +6,36 @@
 
 namespace my {
 
-class RenderService : public BasicService {
+class RenderService : public BasicService// , public Bindable
+{
   public:
     RenderService() {}
 
     static unique_ptr<RenderService> make(shared_ptr<Window>);
     virtual SkCanvas *canvas() = 0;
 
-    void root_node(shared_ptr<RootNode2D> n) {
-
-#ifdef MY_DEBUG
-        if (this->_root_node) {
-            this->_root_node->reset_render_thread_info();
-        }
-        n->render_thread_info(this->coordination().get_thread_info());
-#endif // MY_DEBUG
-
-        this->_root_node = n;
-    }
-
-    shared_ptr<RootNode2D> root_node() { return this->_root_node; }
+    void connect(shared_ptr<Node2DTree> tree) { this->_node2dtree = tree; }
+    void disconnect(shared_ptr<Node2DTree>) { this->_node2dtree.reset(); }
 
     template <typename Func> void run_at(Func &&func) {
         this->schedule<void>(
             [this, func = std::forward<Func>(func)]() { func(this); });
     }
 
-    shared_ptr<RootNode2D> _root_node;
+protected:
+    shared_ptr<Node2DTree> node2dtree() {
+        return this->_node2dtree;
+    }
+
+  private:
+    shared_ptr<Node2DTree> _node2dtree;
 };
+
+void Node2DTree::check_run_at_render_thread() {
+    auto thread_info = this->renderer()->coordination().get_thread_info();
+    if (!thread_info.at_this_thread()) {
+        throw RenderServiceError("Node2D ui operations must render thread");
+    }
+}
 
 } // namespace my

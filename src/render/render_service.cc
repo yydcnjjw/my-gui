@@ -29,12 +29,12 @@ class SDLRenderService : public RenderService {
 
     void draw_node2D(shared_ptr<Node2D> node) {
         auto parent = node->parent();
-        auto region = parent ? parent->rect() : this->root_node()->rect();
+        auto parent_rect = parent ? parent->rect() : node->rect();
         auto [l, t] = node->pos();
         auto snapshot = node->snapshot();
 
         this->canvas()->save();
-        this->canvas()->clipRect(region);
+        this->canvas()->clipRect(parent_rect);
         this->canvas()->translate(0, 0);
 
         this->canvas()->drawImage(snapshot, l, t);
@@ -47,8 +47,8 @@ class SDLRenderService : public RenderService {
     }
 
     void draw_root() {
-        if (this->root_node()) {
-            this->draw_node2D(this->root_node());
+        if (this->node2dtree()) {
+            this->draw_node2D(this->node2dtree()->root());
         }
     }
 

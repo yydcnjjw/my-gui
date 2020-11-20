@@ -47,7 +47,6 @@ class PosixApplication : public my::Application {
     // }
 
   private:
-
     // std::unique_ptr<my::AsyncTask> _async_task;
     // std::unique_ptr<my::WindowMgr> _win_mgr;
     // std::unique_ptr<my::ResourceMgr> _resource_mgr;
@@ -58,6 +57,9 @@ class PosixApplication : public my::Application {
 } // namespace
 
 namespace my {
+
+Application *Application::_instance = nullptr;
+
 unique_ptr<Application>
 Application::create(int argc, char **argv,
                     const po::options_description &opts_desc) {
