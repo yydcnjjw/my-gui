@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
                         GLOG_D("%d %d", (*e)->pos().x(), (*e)->pos().y());
                     });
                 });
-            sub_n->canvas().clear(SkColors::kGray);
+            sub_n->canvas().clear(SkColors::kGray.toSkColor());
             paint.setColor(SkColors::kRed);
             sub_n->canvas().drawIRect(IRect::MakeWH(200, 200), paint);
             root->add_sub_node(sub_n);
