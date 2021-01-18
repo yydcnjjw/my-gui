@@ -21,15 +21,11 @@ private:
 };
 
 class Application : public EventBus {
+  using self_type = Application;
+
 public:
   using coordination_type = main_loop::coordination_type;
   using options_description = po::options_description;
-  Application(int argc, char **argv, options_description const &opts_desc) {
-    pthread_setname_np(pthread_self(), "application service");
-    this->parse_program_options(argc, argv, opts_desc);
-    this->register_service(WindowService::create());
-    this->register_service(ResourceService::create());
-  };
 
   virtual ~Application() = default;
 
@@ -44,7 +40,6 @@ public:
       GLOG_E(e.what());
     }
   };
-
   void quit() { this->_main_loop.quit(); };
 
   coordination_type coordination() { return this->_main_loop.coordination(); };
@@ -76,6 +71,14 @@ public:
 
   static Application *create(int argc, char **argv,
                              options_description const & = {});
+
+protected:
+  Application(int argc, char **argv, options_description const &opts_desc) {
+    pthread_setname_np(pthread_self(), "application service");
+    this->parse_program_options(argc, argv, opts_desc);
+    this->register_service(WindowService::create());
+    this->register_service(ResourceService::create());
+  };
 
 private:
   static unique_ptr<Application> _instance;

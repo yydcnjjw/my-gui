@@ -1,6 +1,6 @@
 #pragma once
 
-#include <core/basic_service.hpp>
+#include <core/core.hpp>
 #include <storage/exception.hpp>
 #include <storage/resource.hpp>
 
