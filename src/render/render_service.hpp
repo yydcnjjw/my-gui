@@ -6,36 +6,48 @@
 
 namespace my {
 
-class RenderService : public BasicService// , public Bindable
-{
-  public:
-    RenderService() {}
+class RenderService;
 
-    static unique_ptr<RenderService> make(shared_ptr<Window>);
-    virtual SkCanvas *canvas() = 0;
+class CanvasPtr {
+public:
+  CanvasPtr(SkCanvas *ptr, RenderService *renderer)
+      : _ptr(ptr), _renderer(renderer) {}
 
-    void connect(shared_ptr<Node2DTree> tree) { this->_node2dtree = tree; }
-    void disconnect(shared_ptr<Node2DTree>) { this->_node2dtree.reset(); }
+  SkCanvas *operator->();
 
-    template <typename Func> void run_at(Func &&func) {
-        this->schedule<void>(
-            [this, func = std::forward<Func>(func)]() { func(this); });
-    }
+private:
+  SkCanvas *_ptr;
+  RenderService *_renderer;
 
-protected:
-    shared_ptr<Node2DTree> node2dtree() {
-        return this->_node2dtree;
-    }
-
-  private:
-    shared_ptr<Node2DTree> _node2dtree;
+  RenderService *renderer() { return this->_renderer; }
 };
 
-void Node2DTree::check_run_at_render_thread() {
-    auto thread_info = this->renderer()->coordination().get_thread_info();
-    if (!thread_info.at_this_thread()) {
-        throw RenderServiceError("Node2D ui operations must render thread");
-    }
+class RenderService : public BasicService // , public Bindable
+{
+public:
+  RenderService() {}
+
+  static unique_ptr<RenderService> make(shared_ptr<Window>);
+  virtual CanvasPtr canvas() = 0;
+
+  template <typename Func> void run_at(Func &&func) {
+    this->schedule<void>(
+        [this, func = std::forward<Func>(func)]() { func(this); });
+  }
+
+protected:
+//   shared_ptr<NodeViewTree> node2dtree() { return this->_node2dtree; }
+
+// private:
+//   shared_ptr<NodeViewTree> _node2dtree;
+};
+
+SkCanvas *CanvasPtr::operator->() {
+  auto thread_info = this->renderer()->coordination().get_thread_info();
+  if (!thread_info.at_this_thread()) {
+    throw RenderServiceError("Node2D ui operations must render thread");
+  }
+  return this->_ptr;
 }
 
 } // namespace my

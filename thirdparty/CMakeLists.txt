@@ -67,9 +67,9 @@ build_dep(oiio)
 set(OpenImageIO_DIR ${DEPS_DIR}/lib/cmake/OpenImageIO CACHE INTERNAL "")
 
 # sdl2 mixer
-build_dep(sdl2mixer)
-set(sdl2mixer_inc ${DEPS_DIR}/include CACHE INTERNAL "")
-set(sdl2mixer_lib ${DEPS_DIR}/lib/libSDL2_mixer.so CACHE INTERNAL "")
+# build_dep(sdl2mixer)
+# set(sdl2mixer_inc ${DEPS_DIR}/include CACHE INTERNAL "")
+# set(sdl2mixer_lib ${DEPS_DIR}/lib/libSDL2_mixer.so CACHE INTERNAL "")
 
 # tree.hh
 build_dep(tree_hh)
